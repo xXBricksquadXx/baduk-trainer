@@ -83,8 +83,11 @@ body {
 
 .board-pane {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  position: sticky;
+  top: 24px;
+  align-self: start;
 }
 
 .goban-wrapper {
@@ -317,4 +320,58 @@ button.active {
   .workspace {
     grid-template-columns: 1fr;
   }
+}
+
+.sensei-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.sensei-header h2 {
+  margin: 0;
+}
+
+.model-tag {
+  font-size: 0.68rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #11141a;
+  border: 1px solid var(--border);
+  color: #38bdf8;
+}
+
+.sensei-output {
+  background: #11141a;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.explain-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 0.78rem;
+}
+
+.explain-body {
+  white-space: pre-wrap;
+  color: #e2e8f0;
+}
+
+.explain-line {
+  margin-bottom: 6px; 
+}
+
+.explain-line:last-child { 
+  margin-bottom: 0; 
 }

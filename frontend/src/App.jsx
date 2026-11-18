@@ -30,6 +30,24 @@ const HANDICAP_OPTIONS = [
   { id: 'h4', label: '4 Stones (0.5)', stones: 4, komi: 0.5 },
 ];
 
+function renderFormattedSenseiText(text) {
+  if (!text) return null;
+  return text.split('\n').map((line, lineIdx) => {
+    const cleaned = line.replace(/^\s*[-*]\s+/, '• ');
+    const segments = cleaned.split(/(\*\*[^*]+\*\*)/g);
+    return (
+      <div key={lineIdx} className="explain-line">
+        {segments.map((seg, segIdx) => {
+          if (seg.startsWith('**') && seg.endsWith('**')) {
+            return <strong key={segIdx}>{seg.slice(2, -2)}</strong>;
+          }
+          return <span key={segIdx}>{seg}</span>;
+        })}
+      </div>
+    );
+  });
+}
+
 export default function App() {
   const [handicapId, setHandicapId] = useState('even');
   const [board, setBoard] = useState(() => createInitialBoard(0));
@@ -51,6 +69,12 @@ export default function App() {
   const [aiThinking, setAiThinking] = useState(false);
   const [engineStatus, setEngineStatus] = useState('Checking engine...');
 
+  // Sensei Hints & Ollama Explanation State
+  const [hints, setHints] = useState([]);
+  const [selectedHint, setSelectedHint] = useState(null);
+  const [senseiLoading, setSenseiLoading] = useState(false);
+  const [explanationData, setExplanationData] = useState(null);
+
   const activeHandicap =
     HANDICAP_OPTIONS.find((h) => h.id === handicapId) || HANDICAP_OPTIONS[0];
   const lastMove =
@@ -61,11 +85,18 @@ export default function App() {
   const lastWhiteMove =
     [...moveHistory].reverse().find((m) => m.color === WHITE && m.row >= 0) ||
     null;
+
   useEffect(() => {
     fetch(`${API_BASE}/health`)
       .then((res) => res.json())
       .then((data) => setEngineStatus(`Engine: ${data.engine}`))
       .catch(() => setEngineStatus('Backend offline'));
+  }, []);
+
+  const clearCoaching = useCallback(() => {
+    setHints([]);
+    setSelectedHint(null);
+    setExplanationData(null);
   }, []);
 
   const triggerAiTurn = useCallback(
@@ -186,10 +217,10 @@ export default function App() {
         HANDICAP_OPTIONS.find((h) => h.id === nextHandicapId) ||
         HANDICAP_OPTIONS[0];
       const freshBoard = createInitialBoard(hSpec.stones);
-      // In handicap games (stones >= 2), Black's handicap stones are already placed so White moves first
       const firstTurn = hSpec.stones >= 2 ? WHITE : BLACK;
       const freshCaptures = { [BLACK]: 0, [WHITE]: 0 };
 
+      clearCoaching();
       setVsAi(nextVsAi);
       setHumanColor(nextHumanColor);
       setHandicapId(nextHandicapId);
@@ -219,7 +250,7 @@ export default function App() {
         );
       }
     },
-    [vsAi, humanColor, handicapId, triggerAiTurn],
+    [vsAi, humanColor, handicapId, clearCoaching, triggerAiTurn],
   );
 
   const handleIntersectionClick = async (row, col) => {
@@ -258,6 +289,7 @@ export default function App() {
     const captureNote =
       result.capturedCount > 0 ? ` (Captured ${result.capturedCount})` : '';
 
+    clearCoaching();
     setBoard(result.board);
     setCaptures(updatedCaptures);
     setKoPoint(result.koPoint);
@@ -307,6 +339,7 @@ export default function App() {
       captured: 0,
     };
 
+    clearCoaching();
     setMoveHistory((prev) => [...prev, snapshot]);
     setRedoStack([]);
     setKoPoint(null);
@@ -346,6 +379,7 @@ export default function App() {
     const targetSnapshot = moveHistory[targetIdx];
     const undoneMoves = moveHistory.slice(targetIdx);
 
+    clearCoaching();
     setBoard(targetSnapshot.board);
     setCurrentTurn(targetSnapshot.currentTurn);
     setCaptures(targetSnapshot.captures);
@@ -363,6 +397,7 @@ export default function App() {
     const restoredMoves = redoStack.slice(0, stepsForward);
     const latestRestored = restoredMoves[restoredMoves.length - 1];
 
+    clearCoaching();
     setBoard(latestRestored.nextBoard);
     setCurrentTurn(latestRestored.nextTurn);
     setCaptures(latestRestored.nextCaptures);
@@ -372,6 +407,116 @@ export default function App() {
     setConsecutivePasses(0);
     setGameResult(null);
     setStatusBanner(`Restored to ${latestRestored.coord}.`);
+  };
+
+  const requestHintExplanation = async (
+    targetBoard,
+    targetColor,
+    targetCoord,
+    candidateList,
+    activeKo,
+    mode = 'hint',
+  ) => {
+    setSenseiLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/explain`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          board: targetBoard,
+          color: targetColor,
+          targetMove: targetCoord,
+          candidates: candidateList,
+          koPoint: activeKo ? [activeKo.row, activeKo.col] : null,
+          mode,
+          rank: aiRank,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setExplanationData(data);
+    } catch (err) {
+      setExplanationData({
+        move: targetCoord,
+        explanation: `Sensei explanation unavailable: ${err.message}`,
+        model: 'offline',
+      });
+    } finally {
+      setSenseiLoading(false);
+    }
+  };
+
+  const handleRequestHints = async () => {
+    if (gameResult || aiThinking || senseiLoading) return;
+    setSenseiLoading(true);
+    setStatusBanner('Sensei is analyzing top 4 candidate moves...');
+    try {
+      const res = await fetch(`${API_BASE}/hints`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          board,
+          color: currentTurn,
+          koPoint: koPoint ? [koPoint.row, koPoint.col] : null,
+          rank: '1d',
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const topHints = data.hints || [];
+      setHints(topHints);
+      if (topHints.length > 0) {
+        setSelectedHint(topHints[0]);
+        setStatusBanner(
+          `Showing top ${topHints.length} hints — click any numbered silhouette on the board to inspect.`,
+        );
+        await requestHintExplanation(
+          board,
+          currentTurn,
+          topHints[0].move,
+          topHints,
+          koPoint,
+          'hint',
+        );
+      } else {
+        setSenseiLoading(false);
+      }
+    } catch (err) {
+      setStatusBanner(`Hint error: ${err.message}`);
+      setSenseiLoading(false);
+    }
+  };
+
+  const handleHintClick = async (hint) => {
+    if (senseiLoading) return;
+    // Clicking an already-selected hint silhouette on the board plays that move directly
+    if (selectedHint?.move === hint.move) {
+      await handleIntersectionClick(hint.row, hint.col);
+      return;
+    }
+    setSelectedHint(hint);
+    await requestHintExplanation(
+      board,
+      currentTurn,
+      hint.move,
+      hints,
+      koPoint,
+      'hint',
+    );
+  };
+
+  const handleExplainLastMove = async () => {
+    if (!lastMove || lastMove.row < 0 || senseiLoading || aiThinking) return;
+    setHints([]);
+    setSelectedHint(null);
+    await requestHintExplanation(
+      lastMove.board,
+      lastMove.color,
+      lastMove.coord,
+      [],
+      lastMove.koPoint,
+      'last_move',
+    );
   };
 
   return (
@@ -394,7 +539,10 @@ export default function App() {
             lastBlackMove={lastBlackMove}
             lastWhiteMove={lastWhiteMove}
             koPoint={koPoint}
+            hints={hints}
+            selectedHintCoord={selectedHint?.move || null}
             onIntersectionClick={handleIntersectionClick}
+            onHintClick={handleHintClick}
             disabled={Boolean(gameResult) || aiThinking}
           />
         </section>
@@ -533,6 +681,94 @@ export default function App() {
               >
                 Reset
               </button>
+            </div>
+          </div>
+
+          <div className="panel-card sensei-card">
+            <div className="sensei-header">
+              <h2>Sensei Coaching</h2>
+              {explanationData?.model && (
+                <span className="model-tag">{explanationData.model}</span>
+              )}
+            </div>
+
+            <div className="sym-grid-2">
+              <button
+                className={hints.length > 0 ? 'active' : ''}
+                onClick={handleRequestHints}
+                disabled={Boolean(gameResult) || aiThinking || senseiLoading}
+              >
+                {hints.length > 0 ? 'Refresh Hints' : 'Ask Sensei (4)'}
+              </button>
+              <button
+                onClick={handleExplainLastMove}
+                disabled={
+                  !lastMove || lastMove.row < 0 || aiThinking || senseiLoading
+                }
+              >
+                Explain Last
+              </button>
+            </div>
+
+            {hints.length > 0 && (
+              <div className="sym-grid-4 mt-10">
+                {hints.map((h) => (
+                  <button
+                    key={h.move}
+                    className={selectedHint?.move === h.move ? 'active' : ''}
+                    onClick={() => handleHintClick(h)}
+                    disabled={senseiLoading}
+                    title={`Winrate ${h.winrate}% (${h.scoreLead >= 0 ? '+' : ''}${h.scoreLead})`}
+                  >
+                    #{h.rank} {h.move}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="sensei-output mt-10">
+              {senseiLoading ? (
+                <p className="muted">
+                  Consulting {aiRank.toUpperCase()} Sensei via Ollama...
+                </p>
+              ) : explanationData ? (
+                <>
+                  <div className="explain-meta">
+                    <strong>Focus: {explanationData.move}</strong>
+                    {selectedHint && (
+                      <span>
+                        Win {selectedHint.winrate}% (
+                        {selectedHint.scoreLead >= 0 ? '+' : ''}
+                        {selectedHint.scoreLead})
+                      </span>
+                    )}
+                  </div>
+                  <div className="explain-body">
+                    {renderFormattedSenseiText(explanationData.explanation)}
+                  </div>
+                  {selectedHint && (
+                    <button
+                      className="active mt-10"
+                      style={{ width: '100%' }}
+                      onClick={() =>
+                        handleIntersectionClick(
+                          selectedHint.row,
+                          selectedHint.col,
+                        )
+                      }
+                      disabled={Boolean(gameResult) || aiThinking}
+                    >
+                      Play Hint #{selectedHint.rank} ({selectedHint.move})
+                    </button>
+                  )}
+                </>
+              ) : (
+                <p className="muted">
+                  Click <strong>Ask Sensei (4)</strong> to project candidate
+                  silhouettes onto the board, then click any number to inspect
+                  its purpose.
+                </p>
+              )}
             </div>
           </div>
 

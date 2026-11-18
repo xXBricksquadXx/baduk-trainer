@@ -44,18 +44,16 @@ def detect_engine_backend() -> str:
 
 
 def rank_label_to_strength(rank: str) -> Dict[str, Any]:
-    """
-    Maps user-facing rank string (e.g., '30k', '20k', '10k', '5k', '1d')
-    to rollout simulations, tactical awareness weight, and noise temperature.
-    """
     r = rank.strip().lower()
     if r.endswith("d"):
         dan = max(1, min(9, int(r[:-1] or 1)))
         return {
             "label": f"{dan} Dan",
+            "shortlist_size": 8,
             "rollouts": 90 + dan * 15,
-            "noise": 0.05,
+            "noise": 0.04,
             "tactical_mult": 1.4,
+            "blunder_rate": 0.0,
         }
 
     kyu = 20
@@ -65,13 +63,18 @@ def rank_label_to_strength(rank: str) -> Dict[str, Any]:
         except ValueError:
             kyu = 20
 
-    # 30k -> high randomness, minimal reading; 1k -> focused reading, low noise
     skill = (31 - kyu) / 30.0  # 0.033 at 30k -> 1.0 at 1k
+    # At 30k, shortlist spans almost the entire board with high noise & missed ataris
+    shortlist_size = int(36 - skill * 28)  # 35 at 30k -> 8 at 1k
     return {
         "label": f"{kyu} Kyu",
-        "rollouts": int(6 + skill * 74),
-        "noise": round(max(0.08, (1.0 - skill) * 2.8), 2),
-        "tactical_mult": round(0.4 + skill * 0.9, 2),
+        "shortlist_size": max(8, shortlist_size),
+        "rollouts": int(4 + skill * 76),
+        "noise": round(max(0.06, (1.0 - skill) * 4.5), 2),
+        "tactical_mult": round(0.25 + skill * 1.05, 2),
+        "blunder_rate": round(
+            max(0.0, (kyu - 18) / 20.0), 2
+        ),  # 0.60 at 30k, 0.0 below 18k
     }
 
 
@@ -220,8 +223,15 @@ def evaluate_candidates(
 
     scored.sort(key=lambda x: x[0], reverse=True)
 
-    # Run Monte Carlo rollouts on top shortlist for win-rate calibration
-    shortlist = scored[: max(top_k + 4, 8)]
+    # At 30k, mix in lower-ranked legal moves so the bot makes natural beginner mistakes
+    pool_limit = profile["shortlist_size"]
+    if profile["blunder_rate"] > 0 and len(scored) > 10:
+        broad_pool = scored[:pool_limit]
+        random.shuffle(broad_pool)
+        shortlist = broad_pool[: max(top_k + 4, 8)]
+    else:
+        shortlist = scored[: max(top_k + 4, 8)]
+
     rollouts_per_move = max(2, profile["rollouts"] // len(shortlist))
 
     candidates = []
@@ -238,9 +248,8 @@ def evaluate_candidates(
             1.0 + math.exp(-0.35 * heur_score * profile["tactical_mult"])
         )
         blended_wr = 0.55 * sigmoid_prior + 0.45 * mc_winrate
-        noise = random.gauss(0, 0.04 * profile["noise"])
+        noise = random.gauss(0, 0.05 * profile["noise"])
         final_score = blended_wr + noise
-
         candidates.append(
             {
                 "row": r,

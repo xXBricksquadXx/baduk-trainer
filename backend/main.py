@@ -1,3 +1,4 @@
+from sensei_agent import explain_move_with_sensei
 from typing import List, Optional, Tuple
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,6 +28,16 @@ class MoveRequest(BaseModel):
     color: int = Field(..., ge=1, le=2)
     koPoint: Optional[List[int]] = None
     rank: str = "20k"
+
+
+class ExplainRequest(BaseModel):
+    board: List[List[int]]
+    color: int = Field(..., ge=1, le=2)
+    targetMove: str
+    candidates: List[dict] = []
+    koPoint: Optional[List[int]] = None
+    mode: str = "hint"
+    rank: str = "25k"
 
 
 @app.get("/api/health")
@@ -104,3 +115,29 @@ def get_hints(req: MoveRequest):
         "hints": hints,
         "turnColor": "Black" if req.color == BLACK else "White",
     }
+
+
+@app.post("/api/explain")
+async def explain_move(req: ExplainRequest):
+    if len(req.board) != BOARD_SIZE or any(len(r) != BOARD_SIZE for r in req.board):
+        raise HTTPException(status_code=400, detail="Board must be 9x9")
+
+    ko_tuple: Optional[Tuple[int, int]] = (
+        (req.koPoint[0], req.koPoint[1])
+        if req.koPoint and len(req.koPoint) == 2
+        else None
+    )
+
+    candidates = req.candidates or evaluate_candidates(
+        req.board, req.color, ko_tuple, rank="1d", top_k=4
+    )
+
+    result = await explain_move_with_sensei(
+        board=req.board,
+        turn_color=req.color,
+        target_move=req.targetMove,
+        top_candidates=candidates,
+        mode=req.mode,
+        user_rank=req.rank,
+    )
+    return result
