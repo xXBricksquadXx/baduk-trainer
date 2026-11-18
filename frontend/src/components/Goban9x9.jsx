@@ -14,6 +14,8 @@ export default function Goban9x9({
   board,
   currentTurn,
   lastMove,
+  lastBlackMove = null,
+  lastWhiteMove = null,
   koPoint,
   hints = [], // [{ row, col, rank, move, winrate, scoreLead }]
   selectedHintCoord = null,
@@ -197,7 +199,16 @@ export default function Goban9x9({
           rowArr.map((cell, c) => {
             if (cell === EMPTY) return null;
             const { x, y } = getXY(r, c);
-            const isLast = lastMove && lastMove.row === r && lastMove.col === c;
+            const isAbsoluteLast =
+              lastMove && lastMove.row === r && lastMove.col === c;
+            const isColorLast =
+              (cell === BLACK &&
+                lastBlackMove?.row === r &&
+                lastBlackMove?.col === c) ||
+              (cell === WHITE &&
+                lastWhiteMove?.row === r &&
+                lastWhiteMove?.col === c);
+
             return (
               <g key={`stone-${r}-${c}`} filter="url(#stoneShadow)">
                 <circle
@@ -212,14 +223,15 @@ export default function Goban9x9({
                   stroke={cell === WHITE ? '#999' : 'none'}
                   strokeWidth="0.8"
                 />
-                {isLast && (
+                {(isAbsoluteLast || isColorLast) && (
                   <circle
                     cx={x}
                     cy={y}
-                    r={stoneRadius * 0.34}
+                    r={stoneRadius * 0.36}
                     fill="none"
-                    stroke={cell === BLACK ? '#f59e0b' : '#dc2626'}
-                    strokeWidth="2.4"
+                    stroke={cell === BLACK ? '#fbbf24' : '#dc2626'}
+                    strokeWidth={isAbsoluteLast ? '2.8' : '1.6'}
+                    opacity={isAbsoluteLast ? 1 : 0.45}
                   />
                 )}
               </g>

@@ -12,3 +12,7 @@ backend/data/*.db
 # OS / Editor
 .DS_Store
 Thumbs.db
+
+# Go Engine Binaries & Weights
+backend/engine/*.exe
+backend/engine/*.bin.gz

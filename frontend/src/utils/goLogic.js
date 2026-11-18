@@ -6,10 +6,28 @@ export const WHITE = 2;
 // Standard Go column labels (skips 'I' to avoid confusion with '1' or 'J')
 export const COL_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J'];
 
+// Traditional 9x9 star-point (3-3) handicap placements: G7, C3, C7, G3
+const HANDICAP_COORDS_9X9 = [
+  [2, 6], // G7
+  [6, 2], // C3
+  [2, 2], // C7
+  [6, 6], // G3
+];
+
 export function createEmptyBoard() {
   return Array.from({ length: BOARD_SIZE }, () =>
     Array(BOARD_SIZE).fill(EMPTY),
   );
+}
+
+export function createInitialBoard(handicapStones = 0) {
+  const board = createEmptyBoard();
+  const count = Math.max(0, Math.min(4, handicapStones));
+  for (let i = 0; i < count; i++) {
+    const [r, c] = HANDICAP_COORDS_9X9[i];
+    board[r][c] = BLACK;
+  }
+  return board;
 }
 
 export function cloneBoard(board) {
@@ -42,9 +60,6 @@ function getNeighbors(row, col) {
   return neighbors;
 }
 
-/**
- * Flood-fill to collect all connected stones of the same color and count unique liberties.
- */
 export function getGroupAndLiberties(board, startRow, startCol) {
   const color = board[startRow][startCol];
   if (color === EMPTY) return { stones: [], liberties: 0 };
@@ -75,10 +90,6 @@ export function getGroupAndLiberties(board, startRow, startCol) {
   return { stones, liberties: libertySet.size };
 }
 
-/**
- * Attempts to play a move at (row, col) for `color`.
- * Returns { valid: true, board, capturedCount, koPoint } or { valid: false, reason }.
- */
 export function applyMove(board, row, col, color, koPoint = null) {
   if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
     return { valid: false, reason: 'Out of bounds.' };
@@ -99,7 +110,6 @@ export function applyMove(board, row, col, color, koPoint = null) {
 
   let capturedStones = [];
 
-  // 1. Check adjacent opponent groups for zero liberties (captures happen before suicide check)
   for (const [nr, nc] of getNeighbors(row, col)) {
     if (nextBoard[nr][nc] === opponent) {
       const group = getGroupAndLiberties(nextBoard, nr, nc);
@@ -112,13 +122,11 @@ export function applyMove(board, row, col, color, koPoint = null) {
     }
   }
 
-  // 2. Check suicide rule on the newly placed stone's group
   const selfGroup = getGroupAndLiberties(nextBoard, row, col);
   if (selfGroup.liberties === 0) {
     return { valid: false, reason: 'Illegal suicide move (0 liberties).' };
   }
 
-  // 3. Detect simple Ko: single stone captured by a single-stone group with 1 liberty
   let nextKoPoint = null;
   if (
     capturedStones.length === 1 &&
@@ -136,10 +144,7 @@ export function applyMove(board, row, col, color, koPoint = null) {
   };
 }
 
-/**
- * Quick Chinese-style area count (stones on board + surrounded empty intersections + komi).
- */
-export function estimateAreaScore(board, komi = 5.5) {
+export function estimateAreaScore(board, komi = 6.5) {
   let blackScore = 0;
   let whiteScore = komi;
   const visited = new Set();
@@ -152,7 +157,6 @@ export function estimateAreaScore(board, komi = 5.5) {
       } else if (cell === WHITE) {
         whiteScore += 1;
       } else if (!visited.has(`${r},${c}`)) {
-        // Flood-fill empty region to see which color borders it exclusively
         const region = [];
         const borders = new Set();
         const stack = [[r, c]];
