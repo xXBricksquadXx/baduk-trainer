@@ -1,7 +1,7 @@
 {
   "category": "02-atari",
-  "title": "02. Atari & Liberties (28k–25k)",
-  "description": "Spot stones down to their last liberty (Atari) and execute clean captures or escapes.",
+  "title": "02. Atari & Chain Liberties (28k–24k)",
+  "description": "Count shared liberties of connected stone chains, escape multi-stone atari, and finish 2-step edge captures.",
   "puzzles": [
     {
       "id": "atari-01",
@@ -74,6 +74,92 @@
       ],
       "wrongHints": {
         "default": "Look at the bottom-left corner intersection (A1)—it is the only remaining breathing space for White's B1-C1 group."
+      }
+    },
+    {
+      "id": "atari-04",
+      "title": "Counting a 3-Stone L-Chain",
+      "rank": "25k",
+      "prompt": "Connected stones share all liberties as a single unit. White's 3-stone L-shape (D6-E6-E5) is down to 1 shared liberty. Find and plug it!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D6", "color": 2 },
+        { "coord": "E6", "color": 2 },
+        { "coord": "E5", "color": 2 },
+        { "coord": "D7", "color": 1 },
+        { "coord": "E7", "color": 1 },
+        { "coord": "C6", "color": 1 },
+        { "coord": "D5", "color": 1 },
+        { "coord": "E4", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "F6",
+          "reply": null,
+          "feedback": "Sharp eye! Even though F5 is also empty, wait—let's check: F6 and F5 are two liberties unless one is blocked. Plugging F6 puts the entire 3-stone chain in immediate Atari toward the edge!"
+        },
+        {
+          "move": "F5",
+          "reply": null,
+          "feedback": "Sharp eye! F5 cuts off the lower breathing space of White's 3-stone chain, reducing the entire group to 1 liberty at F6."
+        }
+      ],
+      "wrongHints": {
+        "default": "Trace every empty intersection touching D6, E6, or E5. Only F6 and F5 remain open—strike one of those two shared liberties!"
+      }
+    },
+    {
+      "id": "atari-05",
+      "title": "Double Atari Trap",
+      "rank": "24k",
+      "prompt": "White has two separate groups each sitting at 2 liberties (C5 and E5). Play the single fork point that puts BOTH groups into Atari at once!",
+      "turn": 1,
+      "stones": [
+        { "coord": "C5", "color": 2 },
+        { "coord": "E5", "color": 2 },
+        { "coord": "C6", "color": 1 },
+        { "coord": "B5", "color": 1 },
+        { "coord": "E6", "color": 1 },
+        { "coord": "F5", "color": 1 },
+        { "coord": "D4", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "D5",
+          "reply": null,
+          "feedback": "Double Atari! D5 simultaneously removes the shared liberty between C5 and E5—White can only save one stone, so you capture the other!"
+        }
+      ],
+      "wrongHints": {
+        "default": "Look at the intersection sitting directly between C5 and E5. Playing there threatens both White stones simultaneously."
+      }
+    },
+    {
+      "id": "atari-06",
+      "title": "2-Step Chase to the 1st Line",
+      "rank": "24k",
+      "prompt": "White's stone at G3 has 2 liberties (H3 and G2). Drive it toward the edge so it runs out of room!",
+      "turn": 1,
+      "stones": [
+        { "coord": "G3", "color": 2 },
+        { "coord": "F3", "color": 1 },
+        { "coord": "G4", "color": 1 },
+        { "coord": "H4", "color": 1 }
+      ],
+      "steps": [
+        {
+          "move": "H3",
+          "reply": "G2",
+          "feedback": "Step 1 complete! Blocking H3 forces White down onto the 2nd line at G2. Now finish the capture!"
+        },
+        {
+          "move": "G1",
+          "reply": null,
+          "feedback": "Step 2 complete! Blocking G1 stops White from reaching the bottom edge—White is now trapped in Atari with nowhere to run."
+        }
+      ],
+      "wrongHints": {
+        "default": "Never chase toward the open center! Block the side escape route (H3 first, then G1) so the edge of the board acts as your wall."
       }
     }
   ]

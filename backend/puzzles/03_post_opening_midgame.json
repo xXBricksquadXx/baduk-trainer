@@ -1,0 +1,98 @@
+{
+  "category": "03-midgame",
+  "title": "03. After Move 5: Midgame Awareness (26k–22k)",
+  "description": "Bridge the gap past the opening: respond to aggressive invasions, claim open territory, and avoid chasing strong groups.",
+  "puzzles": [
+    {
+      "id": "mid-01",
+      "title": "Punishing an Aggressive Attachment",
+      "rank": "26k",
+      "prompt": "Move 6: You own C3 and E5. White aggressively attaches right against your C3 stone at D3. Stand up solid to protect your corner!",
+      "turn": 1,
+      "stones": [
+        { "coord": "C3", "color": 1 },
+        { "coord": "E5", "color": 1 },
+        { "coord": "G7", "color": 2 },
+        { "coord": "D3", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "C4",
+          "reply": null,
+          "feedback": "Textbook Hane/Extend! Standing up at C4 keeps your C3 stone connected toward your E5 center stone while securing the left side."
+        },
+        {
+          "move": "D4",
+          "reply": null,
+          "feedback": "Strong! Pressing at D4 uses your E5 ally to surround White's aggressive D3 stone."
+        }
+      ],
+      "wrongHints": {
+        "default": "When the opponent touches your stone directly, respond locally! Extend upward at C4 or press on top at D4 to link with E5."
+      }
+    },
+    {
+      "id": "mid-02",
+      "title": "Big Empty Side vs. Small Endgame",
+      "rank": "25k",
+      "prompt": "Move 7: Both corners on the top are settled, while the entire bottom half of the board is wide open. Claim the biggest remaining territory!",
+      "turn": 1,
+      "stones": [
+        { "coord": "C7", "color": 1 },
+        { "coord": "D7", "color": 1 },
+        { "coord": "G7", "color": 2 },
+        { "coord": "F7", "color": 2 },
+        { "coord": "E6", "color": 1 },
+        { "coord": "F6", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "C3",
+          "reply": null,
+          "feedback": "Big-picture awareness! While the top is crowded, C3 stakes out the entire open bottom-left quadrant in a single move."
+        },
+        {
+          "move": "G3",
+          "reply": null,
+          "feedback": "Big-picture awareness! G3 claims the wide-open bottom-right quadrant while the top is already contested."
+        },
+        {
+          "move": "E3",
+          "reply": null,
+          "feedback": "Good! E3 stakes out the open bottom 3rd line where the largest points remain."
+        }
+      ],
+      "wrongHints": {
+        "default": "Stop adding stones to the crowded top area—look at the empty bottom half of the board and claim a 3-3 corner (C3 or G3)!"
+      }
+    },
+    {
+      "id": "mid-03",
+      "title": "2-Step Corner Defense",
+      "rank": "23k",
+      "prompt": "White invades your corner at B3 while you hold C4 and E4. Block White's escape along the side!",
+      "turn": 1,
+      "stones": [
+        { "coord": "C4", "color": 1 },
+        { "coord": "E4", "color": 1 },
+        { "coord": "G6", "color": 2 },
+        { "coord": "B3", "color": 2 }
+      ],
+      "steps": [
+        {
+          "move": "B4",
+          "reply": "C3",
+          "feedback": "Good block at B4! White pushes into C3 trying to make a base. Now seal the bottom exit!"
+        },
+        {
+          "move": "D3",
+          "reply": null,
+          "feedback": "Sealed! D3 connects with your C4-E4 wall and traps White's B3-C3 stones inside a cramped corner with minimal eye space."
+        }
+      ],
+      "wrongHints": {
+        "default": "Keep White trapped in the corner: block above at B4 first, then seal the right side at D3."
+      }
+    }
+  ]
+}

@@ -110,7 +110,7 @@ body {
 
 .status-pill {
   flex: 1;
-  min-width: 180px;
+  min-width: 0;
   max-width: 420px;
   height: 36px;
   line-height: 34px;
@@ -501,4 +501,41 @@ button.active {
   .board-pane {
     position: static;
   }
+}
+
+/* Live Header Advantage Stream (#349259 Emerald) */
+.advantage-pill {
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(52, 146, 89, 0.18);
+  border: 1px solid #349259;
+  color: #86efac;
+  white-space: nowrap;
+  box-shadow: 0 0 10px rgba(52, 146, 89, 0.22);
+}
+
+/* Auto-Scaling Drill Strip (Supports Unlimited Puzzles per Pack) */
+.drill-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 118px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.drill-chip {
+  min-width: 58px;
+  flex: 1 0 22%;
+  height: 32px;
+  font-size: 0.76rem;
+  padding: 0 8px;
+}
+
+.puzzle-feedback.step {
+  border-color: #349259;
+  background: rgba(52, 146, 89, 0.16);
+  color: #bbf7d0;
 }

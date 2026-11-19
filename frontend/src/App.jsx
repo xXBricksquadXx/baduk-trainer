@@ -6,6 +6,7 @@ import {
   createInitialBoard,
   applyMove,
   toCoordString,
+  fromCoordString,
   estimateAreaScore,
 } from './utils/goLogic';
 import './App.css';
@@ -84,6 +85,7 @@ export default function App() {
   const [puzzleLastMove, setPuzzleLastMove] = useState(null);
   const [puzzleFeedback, setPuzzleFeedback] = useState(null);
   const [puzzleSolved, setPuzzleSolved] = useState(false);
+  const [puzzleStepIndex, setPuzzleStepIndex] = useState(0);
   const [progressStats, setProgressStats] = useState({
     solvedIds: [],
     totalSolved: 0,
@@ -105,6 +107,10 @@ export default function App() {
   const lastWhiteMove =
     [...moveHistory].reverse().find((m) => m.color === WHITE && m.row >= 0) ||
     null;
+  const liveAdvantage =
+    activeTab === 'match'
+      ? estimateAreaScore(board, activeHandicap.komi)
+      : null;
 
   useEffect(() => {
     fetch(`${API_BASE}/health`)
@@ -610,6 +616,7 @@ export default function App() {
     setPuzzleLastMove(null);
     setPuzzleFeedback(null);
     setPuzzleSolved(false);
+    setPuzzleStepIndex(0);
     setStatusBanner(`Drill [${puzz.rank.toUpperCase()}]: ${puzz.title}`);
   };
 
@@ -634,24 +641,63 @@ export default function App() {
           puzzleId: currentPuzzle.id,
           category: currentPack.category,
           move: coord,
+          stepIndex: puzzleStepIndex,
         }),
       });
       const data = await apiRes.json();
       if (data.progress) setProgressStats(data.progress);
-      setPuzzleFeedback({
-        solved: data.solved,
-        text: data.feedback,
-        move: coord,
-      });
 
       if (data.solved) {
         setPuzzleSolved(true);
+        setPuzzleFeedback({
+          status: 'solved',
+          text: data.feedback,
+          move: coord,
+        });
         setStatusBanner(`Solved ${currentPuzzle.title} with ${coord}!`);
+      } else if (data.stepComplete) {
+        const nextIdx = data.nextStepIndex ?? puzzleStepIndex + 1;
+        setPuzzleStepIndex(nextIdx);
+        setPuzzleFeedback({
+          status: 'step',
+          text: data.feedback,
+          move: coord,
+        });
+        setStatusBanner(`Step ${nextIdx} complete — Opponent responding...`);
+
+        if (data.reply) {
+          const replyCoord = fromCoordString(data.reply);
+          if (replyCoord) {
+            const oppColor = currentPuzzle.turn === BLACK ? WHITE : BLACK;
+            setTimeout(() => {
+              const afterReply = applyMove(
+                res.board,
+                replyCoord.row,
+                replyCoord.col,
+                oppColor,
+                null,
+              );
+              if (afterReply.valid) {
+                setPuzzleBoard(afterReply.board);
+                setPuzzleLastMove({ row: replyCoord.row, col: replyCoord.col });
+                setStatusBanner(
+                  `Opponent played ${data.reply} — Play Step ${nextIdx + 1}!`,
+                );
+              }
+            }, 420);
+          }
+        }
       } else {
+        setPuzzleFeedback({
+          status: 'retry',
+          text: data.feedback,
+          move: coord,
+        });
         setStatusBanner(`Try again — ${coord} didn't solve the drill.`);
         setTimeout(() => {
           setPuzzleBoard(currentPuzzle.board);
           setPuzzleLastMove(null);
+          setPuzzleStepIndex(0);
         }, 850);
       }
     } catch (err) {
@@ -672,6 +718,14 @@ export default function App() {
         <div className="brand">
           <span className="brand-dot" />
           <h1>AI Sensei 9x9</h1>
+          {liveAdvantage && (
+            <span
+              className="advantage-pill"
+              title="Live Area Territory Lead (Includes Komi)"
+            >
+              {liveAdvantage.winner} +{liveAdvantage.margin}
+            </span>
+          )}
           <span className="badge">{engineStatus}</span>
           <span className="badge">Rank: {progressStats.estimatedRank}</span>
         </div>
@@ -682,6 +736,11 @@ export default function App() {
             onClick={() => {
               clearCoaching();
               setActiveTab('match');
+              setStatusBanner(
+                gameResult
+                  ? `Match complete — ${gameResult.winner} won by ${gameResult.margin} pts.`
+                  : `${currentTurn === BLACK ? 'Black' : 'White'} to play.`,
+              );
             }}
           >
             Match Play
@@ -698,7 +757,12 @@ export default function App() {
           </button>
           <button
             className={activeTab === 'progress' ? 'active' : ''}
-            onClick={() => setActiveTab('progress')}
+            onClick={() => {
+              setActiveTab('progress');
+              setStatusBanner(
+                `Dojo Rubric: ${progressStats.estimatedRank} (${progressStats.totalSolved} drills mastered).`,
+              );
+            }}
           >
             Progress
           </button>
@@ -814,14 +878,15 @@ export default function App() {
                 </label>
 
                 {currentPack && (
-                  <div className="sym-grid-4 mt-10">
+                  <div className="drill-strip mt-10">
                     {currentPack.puzzles.map((p, idx) => {
                       const isDone = progressStats.solvedIds?.includes(p.id);
                       return (
                         <button
                           key={p.id}
-                          className={activePuzzleIdx === idx ? 'active' : ''}
+                          className={`drill-chip ${activePuzzleIdx === idx ? 'active' : ''}`}
                           onClick={() => selectPuzzle(activePackIdx, idx)}
+                          title={`${p.title} (${p.rank.toUpperCase()})`}
                         >
                           #{idx + 1} {isDone ? '✓' : ''}
                         </button>
@@ -848,12 +913,14 @@ export default function App() {
                   </p>
 
                   {puzzleFeedback && (
-                    <div
-                      className={`puzzle-feedback ${puzzleFeedback.solved ? 'solved' : 'retry'}`}
-                    >
+                    <div className={`puzzle-feedback ${puzzleFeedback.status}`}>
                       <strong>
-                        {puzzleFeedback.solved ? '✓ Solved' : '✕ Retry'}(
-                        {puzzleFeedback.move}):{' '}
+                        {puzzleFeedback.status === 'solved'
+                          ? '✓ Solved'
+                          : puzzleFeedback.status === 'step'
+                            ? '⚡ Step Clear'
+                            : '✕ Retry'}
+                        ({puzzleFeedback.move}):{' '}
                       </strong>
                       {puzzleFeedback.text}
                     </div>

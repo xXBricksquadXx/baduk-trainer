@@ -160,6 +160,7 @@ class PuzzleAttemptRequest(BaseModel):
     puzzleId: str
     category: str
     move: str
+    stepIndex: int = 0
 
 
 class MatchRecordRequest(BaseModel):
@@ -213,6 +214,52 @@ def submit_puzzle_attempt(req: PuzzleAttemptRequest):
         raise HTTPException(status_code=404, detail="Puzzle not found")
 
     move_upper = req.move.strip().upper()
+    steps = target_puzzle.get("steps")
+
+    # Multi-step sequential drill mode
+    if steps and 0 <= req.stepIndex < len(steps):
+        current_step = steps[req.stepIndex]
+        accepted = [
+            m.upper() for m in current_step.get("moves", [current_step.get("move", "")])
+        ]
+        if move_upper in accepted:
+            is_final = req.stepIndex == len(steps) - 1
+            if is_final:
+                progress = record_puzzle_result(req.puzzleId, req.category, solved=True)
+                return {
+                    "solved": True,
+                    "stepComplete": True,
+                    "nextStepIndex": req.stepIndex + 1,
+                    "feedback": current_step["feedback"],
+                    "reply": None,
+                    "progress": progress,
+                }
+            return {
+                "solved": False,
+                "stepComplete": True,
+                "nextStepIndex": req.stepIndex + 1,
+                "feedback": current_step["feedback"],
+                "reply": current_step.get("reply"),
+                "progress": get_progress_summary(),
+            }
+
+        progress = record_puzzle_result(req.puzzleId, req.category, solved=False)
+        wrong_hints = current_step.get("wrongHints") or target_puzzle.get(
+            "wrongHints", {}
+        )
+        feedback = wrong_hints.get(move_upper) or wrong_hints.get(
+            "default", "Not quite — re-read the liberties and shape, then try again."
+        )
+        return {
+            "solved": False,
+            "stepComplete": False,
+            "nextStepIndex": req.stepIndex,
+            "feedback": feedback,
+            "reply": None,
+            "progress": progress,
+        }
+
+    # Standard 1-step solution list mode (backward compatible)
     matched = next(
         (
             s
@@ -226,6 +273,8 @@ def submit_puzzle_attempt(req: PuzzleAttemptRequest):
         progress = record_puzzle_result(req.puzzleId, req.category, solved=True)
         return {
             "solved": True,
+            "stepComplete": True,
+            "nextStepIndex": 1,
             "feedback": matched["feedback"],
             "reply": matched.get("reply"),
             "progress": progress,
@@ -238,6 +287,8 @@ def submit_puzzle_attempt(req: PuzzleAttemptRequest):
     )
     return {
         "solved": False,
+        "stepComplete": False,
+        "nextStepIndex": 0,
         "feedback": feedback,
         "reply": None,
         "progress": progress,
