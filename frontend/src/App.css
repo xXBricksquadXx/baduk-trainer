@@ -1,13 +1,21 @@
+/* ==========================================================================
+   1. DESIGN TOKENS & GLOBAL RESET
+   ========================================================================== */
 :root {
   --bg: #0f1115;
   --panel: #171a21;
+  --surface: #11141a;
   --border: #2a2f3a;
   --text: #e5e7eb;
   --muted: #9ca3af;
   --accent: #eab308;
+  --accent-bright: #fef08a;
+  --accent-glow: rgba(234, 179, 8, 0.25);
 }
 
-* {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
 }
 
@@ -16,6 +24,7 @@ body {
   background-color: var(--bg);
   color: var(--text);
   font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  overflow-y: scroll; /* Prevents scrollbar pop-in jump between tabs */
 }
 
 .app-shell {
@@ -24,11 +33,15 @@ body {
   flex-direction: column;
 }
 
+/* ==========================================================================
+   2. TOP HEADER BAR & GLINT NAVIGATION (Fixed Height — Zero Vertical Jump)
+   ========================================================================== */
 .top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 24px;
+  min-height: 60px;
+  padding: 10px 24px;
   background: var(--panel);
   border-bottom: 1px solid var(--border);
   gap: 16px;
@@ -38,47 +51,94 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .brand h1 {
-  font-size: 1.1rem;
+  font-size: 1.08rem;
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .brand-dot {
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   background: var(--accent);
+  box-shadow: 0 0 8px var(--accent-glow);
+  flex-shrink: 0;
 }
 
 .badge {
   font-size: 0.72rem;
-  padding: 2px 8px;
+  font-weight: 600;
+  padding: 3px 10px;
   border-radius: 999px;
-  background: #262b36;
+  background: #222733;
   color: var(--accent);
   border: 1px solid #3b4252;
+  white-space: nowrap;
+}
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.top-nav button {
+  padding: 0 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.top-nav button:hover:not(:disabled) {
+  background: linear-gradient(
+    90deg,
+    #232834 0%,
+    rgba(234, 179, 8, 0.24) 50%,
+    #232834 100%
+  );
+  background-size: 200% auto;
+  border-color: var(--accent);
+  color: var(--accent-bright);
+  box-shadow: 0 0 12px rgba(234, 179, 8, 0.25), inset 0 0 6px rgba(234, 179, 8, 0.12);
+  animation: glintShine 2.6s linear infinite;
 }
 
 .status-pill {
-  font-size: 0.88rem;
-  padding: 6px 14px;
+  flex: 1;
+  min-width: 180px;
+  max-width: 420px;
+  height: 36px;
+  line-height: 34px;
+  font-size: 0.84rem;
+  padding: 0 14px;
   background: #1f242d;
   border: 1px solid var(--border);
   border-radius: 6px;
   color: #f3f4f6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
 }
 
+/* ==========================================================================
+   3. WORKSPACE LAYOUT & STICKY GOBAN
+   ========================================================================== */
 .workspace {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 360px;
+  grid-template-columns: 1fr 370px;
   gap: 24px;
   padding: 24px;
-  max-width: 1220px;
+  max-width: 1240px;
   width: 100%;
   margin: 0 auto;
+  align-items: start;
 }
 
 .board-pane {
@@ -87,7 +147,6 @@ body {
   justify-content: center;
   position: sticky;
   top: 24px;
-  align-self: start;
 }
 
 .goban-wrapper {
@@ -110,6 +169,9 @@ body {
   gap: 14px;
 }
 
+/* ==========================================================================
+   4. CARDS, SYMMETRICAL GRIDS & FORM CONTROLS
+   ========================================================================== */
 .panel-card {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -118,14 +180,13 @@ body {
 }
 
 .panel-card h2 {
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--muted);
   margin: 0 0 10px 0;
 }
 
-/* Symmetrical Grids */
 .sym-grid-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -153,7 +214,7 @@ body {
 .field-label select {
   width: 100%;
   height: 36px;
-  background: #11141a;
+  background: var(--surface);
   color: var(--text);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -161,6 +222,77 @@ body {
   font-size: 0.8rem;
 }
 
+/* ==========================================================================
+   5. BUTTONS & AMBER GLASS / GLINT STATES
+   ========================================================================== */
+button {
+  height: 36px;
+  background: #252a34;
+  color: var(--text);
+  border: 1px solid #363d4c;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  background: #303744;
+  border-color: #4b5563;
+}
+
+button:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+button.danger:hover:not(:disabled) {
+  background: #7f1d1d;
+  border-color: #991b1b;
+}
+
+button.active,
+.log-entry.latest {
+  border-color: rgba(234, 179, 8, 0.5);
+  background: linear-gradient(
+    90deg,
+    rgba(234, 179, 8, 0.2) 0%,
+    rgba(30, 36, 48, 0.82) 50%,
+    rgba(234, 179, 8, 0.14) 100%
+  );
+  background-size: 200% auto;
+  backdrop-filter: blur(6px);
+  color: var(--accent-bright);
+  animation: glintShine 3.6s linear infinite;
+}
+
+button.active {
+  border: 1px solid var(--accent);
+}
+
+.log-entry.latest {
+  border-left: 3px solid var(--accent);
+  border-top: 1px solid rgba(234, 179, 8, 0.28);
+  border-right: 1px solid rgba(234, 179, 8, 0.15);
+  border-bottom: 1px solid rgba(234, 179, 8, 0.15);
+  color: var(--text);
+}
+
+@keyframes glintShine {
+  0% {
+    background-position: 200% center;
+  }
+  100% {
+    background-position: -200% center;
+  }
+}
+
+/* ==========================================================================
+   6. MATCH TELEMETRY & MOVE LOG
+   ========================================================================== */
 .turn-row {
   display: flex;
   align-items: center;
@@ -173,6 +305,7 @@ body {
   height: 16px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
 }
 
 .stone-indicator.black {
@@ -192,13 +325,13 @@ body {
 }
 
 .capture-box {
-  background: #11141a;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
 }
 
 .capture-box .label {
@@ -207,79 +340,14 @@ body {
 }
 
 .capture-box .value {
-  font-size: 1.15rem;
+  font-size: 1.12rem;
   font-weight: 700;
 }
 
-button {
-  height: 36px;
-  background: #252a34;
-  color: var(--text);
-  border: 1px solid #363d4c;
-  padding: 0 8px;
-  border-radius: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-button:hover:not(:disabled) {
-  background: #303744;
-}
-
-button:disabled {
-  opacity: 0.42;
-  cursor: not-allowed;
-}
-
-button.danger:hover:not(:disabled) {
-  background: #7f1d1d;
-  border-color: #991b1b;
-}
-
-/* Mirrored Amber Glassmorphism for Active Buttons & Latest Log Entry */
-button.active,
-.log-entry.latest {
-  border-color: rgba(234, 179, 8, 0.45);
-  background: linear-gradient(
-    90deg,
-    rgba(234, 179, 8, 0.18) 0%,
-    rgba(30, 36, 48, 0.78) 65%,
-    rgba(24, 29, 38, 0.92) 100%
-  );
-  backdrop-filter: blur(6px);
-  color: #fef08a;
-  animation: amberGlassPulse 2.4s ease-in-out infinite alternate;
-}
-
-button.active {
-  border: 1px solid var(--accent);
-}
-
-.log-entry.latest {
-  border-left: 3px solid var(--accent);
-  border-top: 1px solid rgba(234, 179, 8, 0.28);
-  border-right: 1px solid rgba(234, 179, 8, 0.15);
-  border-bottom: 1px solid rgba(234, 179, 8, 0.15);
-  color: var(--text);
-}
-
-@keyframes amberGlassPulse {
-  from {
-    box-shadow: inset 0 0 0 rgba(234, 179, 8, 0), 0 0 0 rgba(234, 179, 8, 0);
-  }
-  to {
-    box-shadow: inset 0 0 12px rgba(234, 179, 8, 0.14), 0 0 8px rgba(234, 179, 8, 0.12);
-  }
-}
-
 .history-card {
-  flex: 1;
   display: flex;
   flex-direction: column;
-  max-height: 290px;
+  max-height: 280px;
 }
 
 .move-log {
@@ -296,7 +364,7 @@ button.active {
   align-items: center;
   gap: 8px;
   padding: 5px 8px;
-  background: #11141a;
+  background: var(--surface);
   border-radius: 4px;
 }
 
@@ -311,40 +379,36 @@ button.active {
   font-size: 0.74rem;
 }
 
-.muted {
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
-@media (max-width: 880px) {
-  .workspace {
-    grid-template-columns: 1fr;
-  }
-}
-
+/* ==========================================================================
+   7. SENSEI COACHING, PUZZLE DOJO & PROGRESS DASHBOARD
+   ========================================================================== */
 .sensei-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
 .sensei-header h2 {
   margin: 0;
+  line-height: 1.3;
 }
 
 .model-tag {
   font-size: 0.68rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 4px;
-  background: #11141a;
+  background: var(--surface);
   border: 1px solid var(--border);
   color: #38bdf8;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .sensei-output {
-  background: #11141a;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px 12px;
@@ -369,16 +433,11 @@ button.active {
 }
 
 .explain-line {
-  margin-bottom: 6px; 
+  margin-bottom: 6px;
 }
 
-.explain-line:last-child { 
-  margin-bottom: 0; 
-}
-
-.top-nav {
-  display: flex;
-  gap: 8px;
+.explain-line:last-child {
+  margin-bottom: 0;
 }
 
 .puzzle-feedback {
@@ -387,7 +446,7 @@ button.active {
   font-size: 0.82rem;
   line-height: 1.45;
   border: 1px solid var(--border);
-  background: #11141a;
+  background: var(--surface);
 }
 
 .puzzle-feedback.solved {
@@ -414,4 +473,32 @@ button.active {
   max-width: 920px;
   width: 100%;
   margin: 0 auto;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin: 0;
+}
+
+/* ==========================================================================
+   8. RESPONSIVE BREAKPOINTS
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .top-bar {
+    flex-wrap: wrap;
+  }
+  .status-pill {
+    max-width: 100%;
+    text-align: left;
+  }
+}
+
+@media (max-width: 880px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+  .board-pane {
+    position: static;
+  }
 }
