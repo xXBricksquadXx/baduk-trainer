@@ -375,3 +375,43 @@ button.active {
 .explain-line:last-child { 
   margin-bottom: 0; 
 }
+
+.top-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.puzzle-feedback {
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  border: 1px solid var(--border);
+  background: #11141a;
+}
+
+.puzzle-feedback.solved {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
+  color: #dcfce7;
+}
+
+.puzzle-feedback.retry {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  color: #fef3c7;
+}
+
+.progress-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.progress-wide {
+  grid-column: 1 / -1;
+  max-width: 920px;
+  width: 100%;
+  margin: 0 auto;
+}

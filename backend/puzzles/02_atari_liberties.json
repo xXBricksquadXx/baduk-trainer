@@ -1,0 +1,80 @@
+{
+  "category": "02-atari",
+  "title": "02. Atari & Liberties (28k–25k)",
+  "description": "Spot stones down to their last liberty (Atari) and execute clean captures or escapes.",
+  "puzzles": [
+    {
+      "id": "atari-01",
+      "title": "Single-Stone Capture",
+      "rank": "28k",
+      "prompt": "White's stone at E5 has only 1 liberty left. Capture it!",
+      "turn": 1,
+      "stones": [
+        { "coord": "E5", "color": 2 },
+        { "coord": "E6", "color": 1 },
+        { "coord": "D5", "color": 1 },
+        { "coord": "F5", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "E4",
+          "reply": null,
+          "feedback": "Clean capture! Filling White's last liberty at E4 removes the stone and secures the center."
+        }
+      ],
+      "wrongHints": {
+        "default": "Count White E5's empty orthogonal neighbors (up, down, left, right). Three are blocked—fill the last open liberty!"
+      }
+    },
+    {
+      "id": "atari-02",
+      "title": "Save Your Group in Atari",
+      "rank": "27k",
+      "prompt": "Black's two stones at D4-D5 are in Atari (1 liberty left). Extend to gain liberties and survive.",
+      "turn": 1,
+      "stones": [
+        { "coord": "D4", "color": 1 },
+        { "coord": "D5", "color": 1 },
+        { "coord": "D6", "color": 2 },
+        { "coord": "C5", "color": 2 },
+        { "coord": "E5", "color": 2 },
+        { "coord": "C4", "color": 2 },
+        { "coord": "E4", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "D3",
+          "reply": null,
+          "feedback": "Saved! Extending to D3 jumps your group from 1 liberty up to 3 liberties (C3, E3, D2)."
+        }
+      ],
+      "wrongHints": {
+        "default": "Your D4-D5 stones have only 1 breathing space left at D3. Extend there immediately before White captures both stones!"
+      }
+    },
+    {
+      "id": "atari-03",
+      "title": "Corner Edge Squeeze",
+      "rank": "26k",
+      "prompt": "Edge stones have fewer liberties. Put White's two stones at B1-C1 into Atari and capture them.",
+      "turn": 1,
+      "stones": [
+        { "coord": "B1", "color": 2 },
+        { "coord": "C1", "color": 2 },
+        { "coord": "B2", "color": 1 },
+        { "coord": "C2", "color": 1 },
+        { "coord": "D1", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "A1",
+          "reply": null,
+          "feedback": "Nice! Stones on the 1st line have no downward liberties, so plugging A1 captures both White stones."
+        }
+      ],
+      "wrongHints": {
+        "default": "Look at the bottom-left corner intersection (A1)—it is the only remaining breathing space for White's B1-C1 group."
+      }
+    }
+  ]
+}

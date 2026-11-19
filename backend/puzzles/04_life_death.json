@@ -1,0 +1,72 @@
+{
+  "category": "04-life-death",
+  "title": "04. Two Eyes & Life/Death (23k–20k)",
+  "description": "A group needs two separate eyes to live permanently. Find the vital point to make two eyes or destroy the opponent's eyes.",
+  "puzzles": [
+    {
+      "id": "life-01",
+      "title": "Make Two Eyes on the Edge",
+      "rank": "23k",
+      "prompt": "Black's corner group is surrounded by White. Play the vital point inside to split the space into two separate eyes.",
+      "turn": 1,
+      "stones": [
+        { "coord": "A3", "color": 1 },
+        { "coord": "B3", "color": 1 },
+        { "coord": "C3", "color": 1 },
+        { "coord": "C2", "color": 1 },
+        { "coord": "C1", "color": 1 },
+        { "coord": "A4", "color": 2 },
+        { "coord": "B4", "color": 2 },
+        { "coord": "C4", "color": 2 },
+        { "coord": "D3", "color": 2 },
+        { "coord": "D2", "color": 2 },
+        { "coord": "D1", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "B1",
+          "reply": null,
+          "feedback": "Alive! B1 divides your inner pocket into two separate single-point eyes at A1 and B2—White can never legally capture this group."
+        },
+        {
+          "move": "B2",
+          "reply": null,
+          "feedback": "Alive! B2 divides your inner pocket into two separate eyes at A2 and B1."
+        }
+      ],
+      "wrongHints": {
+        "default": "Play in the middle of your 3-space pocket (B1 or B2) so it splits into two separate eyes that White cannot fill simultaneously."
+      }
+    },
+    {
+      "id": "life-02",
+      "title": "Kill the Opponent's Eye Shape",
+      "rank": "21k",
+      "prompt": "White's corner group has a 3-space eye pocket. Strike the vital point before White makes two eyes!",
+      "turn": 1,
+      "stones": [
+        { "coord": "G9", "color": 2 },
+        { "coord": "G8", "color": 2 },
+        { "coord": "G7", "color": 2 },
+        { "coord": "H7", "color": 2 },
+        { "coord": "J7", "color": 2 },
+        { "coord": "F9", "color": 1 },
+        { "coord": "F8", "color": 1 },
+        { "coord": "F7", "color": 1 },
+        { "coord": "G6", "color": 1 },
+        { "coord": "H6", "color": 1 },
+        { "coord": "J6", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "H8",
+          "reply": null,
+          "feedback": "Vital point! Occupying H8 reduces White to at most one eye—the entire corner group is dead."
+        }
+      ],
+      "wrongHints": {
+        "default": "The enemy's vital point is my vital point: play at H8 right in the center of White's 3-point eye space."
+      }
+    }
+  ]
+}

@@ -75,6 +75,26 @@ export default function App() {
   const [senseiLoading, setSenseiLoading] = useState(false);
   const [explanationData, setExplanationData] = useState(null);
 
+  // Milestone 4: Puzzle Dojo & SQLite Progress Telemetry
+  const [activeTab, setActiveTab] = useState('match'); // 'match' | 'dojo' | 'progress'
+  const [puzzlePacks, setPuzzlePacks] = useState([]);
+  const [activePackIdx, setActivePackIdx] = useState(0);
+  const [activePuzzleIdx, setActivePuzzleIdx] = useState(0);
+  const [puzzleBoard, setPuzzleBoard] = useState(() => createInitialBoard(0));
+  const [puzzleLastMove, setPuzzleLastMove] = useState(null);
+  const [puzzleFeedback, setPuzzleFeedback] = useState(null);
+  const [puzzleSolved, setPuzzleSolved] = useState(false);
+  const [progressStats, setProgressStats] = useState({
+    solvedIds: [],
+    totalSolved: 0,
+    totalReps: 0,
+    byCategory: {},
+    recentMatches: [],
+    totalMatches: 0,
+    matchWins: 0,
+    estimatedRank: '30 Kyu',
+  });
+
   const activeHandicap =
     HANDICAP_OPTIONS.find((h) => h.id === handicapId) || HANDICAP_OPTIONS[0];
   const lastMove =
@@ -91,6 +111,18 @@ export default function App() {
       .then((res) => res.json())
       .then((data) => setEngineStatus(`Engine: ${data.engine}`))
       .catch(() => setEngineStatus('Backend offline'));
+
+    fetch(`${API_BASE}/puzzles`)
+      .then((res) => res.json())
+      .then((data) => {
+        const packs = data.packs || [];
+        setPuzzlePacks(packs);
+        if (data.progress) setProgressStats(data.progress);
+        if (packs.length > 0 && packs[0].puzzles?.length > 0) {
+          setPuzzleBoard(packs[0].puzzles[0].board);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const clearCoaching = useCallback(() => {
@@ -98,6 +130,27 @@ export default function App() {
     setSelectedHint(null);
     setExplanationData(null);
   }, []);
+
+  const logCompletedMatch = useCallback(
+    (score, totalMoves) => {
+      if (!vsAi) return;
+      fetch(`${API_BASE}/metrics/match`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          opponentRank: aiRank,
+          humanColor: humanColor === BLACK ? 'Black' : 'White',
+          winner: score.winner,
+          margin: score.margin,
+          movesCount: totalMoves,
+        }),
+      })
+        .then((r) => r.json())
+        .then((d) => d.progress && setProgressStats(d.progress))
+        .catch(() => {});
+    },
+    [vsAi, aiRank, humanColor],
+  );
 
   const triggerAiTurn = useCallback(
     async (
@@ -108,6 +161,7 @@ export default function App() {
       activeCaptures,
       activePasses,
       komiVal,
+      currentMoveCount,
     ) => {
       setAiThinking(true);
       setStatusBanner(`AI Sensei (${aiRank.toUpperCase()}) is reading...`);
@@ -153,6 +207,7 @@ export default function App() {
             setStatusBanner(
               `Game Over (Two Passes). ${score.winner} wins by ${score.margin} pts (B: ${score.black} | W: ${score.white}).`,
             );
+            logCompletedMatch(score, currentMoveCount + 1);
           } else {
             setConsecutivePasses(nextPasses);
             setCurrentTurn(activeHumanColor);
@@ -204,7 +259,7 @@ export default function App() {
         setAiThinking(false);
       }
     },
-    [aiRank],
+    [aiRank, logCompletedMatch],
   );
 
   const startFreshMatch = useCallback(
@@ -243,6 +298,7 @@ export default function App() {
           freshCaptures,
           0,
           hSpec.komi,
+          0,
         );
       } else {
         setStatusBanner(
@@ -269,6 +325,7 @@ export default function App() {
       [currentTurn]: captures[currentTurn] + result.capturedCount,
     };
     const nextTurn = currentTurn === BLACK ? WHITE : BLACK;
+    const nextMoveTotal = moveHistory.length + 1;
 
     const snapshot = {
       board,
@@ -311,6 +368,7 @@ export default function App() {
         updatedCaptures,
         0,
         activeHandicap.komi,
+        nextMoveTotal,
       );
     }
   };
@@ -322,6 +380,7 @@ export default function App() {
     const nextPasses = consecutivePasses + 1;
     const playerLabel = currentTurn === BLACK ? 'Black' : 'White';
     const nextTurn = currentTurn === BLACK ? WHITE : BLACK;
+    const nextMoveTotal = moveHistory.length + 1;
 
     const snapshot = {
       board,
@@ -350,6 +409,7 @@ export default function App() {
       setStatusBanner(
         `Game Over (Two Passes). ${score.winner} wins by ${score.margin} pts (B: ${score.black} | W: ${score.white}).`,
       );
+      logCompletedMatch(score, nextMoveTotal);
       return;
     }
 
@@ -367,6 +427,7 @@ export default function App() {
         captures,
         nextPasses,
         activeHandicap.komi,
+        nextMoveTotal,
       );
     }
   };
@@ -447,7 +508,14 @@ export default function App() {
   };
 
   const handleRequestHints = async () => {
-    if (gameResult || aiThinking || senseiLoading) return;
+    if (senseiLoading) return;
+    if (activeTab === 'match' && (gameResult || aiThinking)) return;
+
+    const targetBoard = activeTab === 'dojo' ? puzzleBoard : board;
+    const targetColor =
+      activeTab === 'dojo' ? currentPuzzle?.turn || BLACK : currentTurn;
+    const targetKo = activeTab === 'dojo' ? null : koPoint;
+
     setSenseiLoading(true);
     setStatusBanner('Sensei is analyzing top 4 candidate moves...');
     try {
@@ -455,9 +523,9 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          board,
-          color: currentTurn,
-          koPoint: koPoint ? [koPoint.row, koPoint.col] : null,
+          board: targetBoard,
+          color: targetColor,
+          koPoint: targetKo ? [targetKo.row, targetKo.col] : null,
           rank: '1d',
         }),
       });
@@ -471,11 +539,11 @@ export default function App() {
           `Showing top ${topHints.length} hints — click any numbered silhouette on the board to inspect.`,
         );
         await requestHintExplanation(
-          board,
-          currentTurn,
+          targetBoard,
+          targetColor,
           topHints[0].move,
           topHints,
-          koPoint,
+          targetKo,
           'hint',
         );
       } else {
@@ -489,18 +557,26 @@ export default function App() {
 
   const handleHintClick = async (hint) => {
     if (senseiLoading) return;
-    // Clicking an already-selected hint silhouette on the board plays that move directly
     if (selectedHint?.move === hint.move) {
-      await handleIntersectionClick(hint.row, hint.col);
+      if (activeTab === 'dojo') {
+        await handlePuzzleIntersectionClick(hint.row, hint.col);
+      } else {
+        await handleIntersectionClick(hint.row, hint.col);
+      }
       return;
     }
+    const targetBoard = activeTab === 'dojo' ? puzzleBoard : board;
+    const targetColor =
+      activeTab === 'dojo' ? currentPuzzle?.turn || BLACK : currentTurn;
+    const targetKo = activeTab === 'dojo' ? null : koPoint;
+
     setSelectedHint(hint);
     await requestHintExplanation(
-      board,
-      currentTurn,
+      targetBoard,
+      targetColor,
       hint.move,
       hints,
-      koPoint,
+      targetKo,
       'hint',
     );
   };
@@ -519,6 +595,77 @@ export default function App() {
     );
   };
 
+  // --- Puzzle Dojo Helpers ---
+  const currentPack = puzzlePacks[activePackIdx] || null;
+  const currentPuzzle = currentPack?.puzzles?.[activePuzzleIdx] || null;
+
+  const selectPuzzle = (pIdx, qIdx) => {
+    const pack = puzzlePacks[pIdx];
+    const puzz = pack?.puzzles?.[qIdx];
+    if (!puzz) return;
+    clearCoaching();
+    setActivePackIdx(pIdx);
+    setActivePuzzleIdx(qIdx);
+    setPuzzleBoard(puzz.board);
+    setPuzzleLastMove(null);
+    setPuzzleFeedback(null);
+    setPuzzleSolved(false);
+    setStatusBanner(`Drill [${puzz.rank.toUpperCase()}]: ${puzz.title}`);
+  };
+
+  const handlePuzzleIntersectionClick = async (row, col) => {
+    if (!currentPuzzle || puzzleSolved) return;
+    const res = applyMove(puzzleBoard, row, col, currentPuzzle.turn, null);
+    if (!res.valid) {
+      setStatusBanner(`Illegal move: ${res.reason}`);
+      return;
+    }
+
+    const coord = toCoordString(row, col);
+    clearCoaching();
+    setPuzzleBoard(res.board);
+    setPuzzleLastMove({ row, col });
+
+    try {
+      const apiRes = await fetch(`${API_BASE}/puzzles/attempt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          puzzleId: currentPuzzle.id,
+          category: currentPack.category,
+          move: coord,
+        }),
+      });
+      const data = await apiRes.json();
+      if (data.progress) setProgressStats(data.progress);
+      setPuzzleFeedback({
+        solved: data.solved,
+        text: data.feedback,
+        move: coord,
+      });
+
+      if (data.solved) {
+        setPuzzleSolved(true);
+        setStatusBanner(`Solved ${currentPuzzle.title} with ${coord}!`);
+      } else {
+        setStatusBanner(`Try again — ${coord} didn't solve the drill.`);
+        setTimeout(() => {
+          setPuzzleBoard(currentPuzzle.board);
+          setPuzzleLastMove(null);
+        }, 850);
+      }
+    } catch (err) {
+      setStatusBanner(`Puzzle check error: ${err.message}`);
+    }
+  };
+
+  const stepPuzzle = (delta) => {
+    if (!currentPack) return;
+    const total = currentPack.puzzles.length;
+    const nextIdx = (activePuzzleIdx + delta + total) % total;
+    selectPuzzle(activePackIdx, nextIdx);
+  };
+
   return (
     <div className="app-shell">
       <header className="top-bar">
@@ -526,280 +673,540 @@ export default function App() {
           <span className="brand-dot" />
           <h1>AI Sensei 9x9</h1>
           <span className="badge">{engineStatus}</span>
+          <span className="badge">Rank: {progressStats.estimatedRank}</span>
         </div>
+
+        <nav className="top-nav">
+          <button
+            className={activeTab === 'match' ? 'active' : ''}
+            onClick={() => {
+              clearCoaching();
+              setActiveTab('match');
+            }}
+          >
+            Match Play
+          </button>
+          <button
+            className={activeTab === 'dojo' ? 'active' : ''}
+            onClick={() => {
+              clearCoaching();
+              setActiveTab('dojo');
+              if (currentPuzzle) selectPuzzle(activePackIdx, activePuzzleIdx);
+            }}
+          >
+            Puzzle Dojo ({progressStats.totalSolved})
+          </button>
+          <button
+            className={activeTab === 'progress' ? 'active' : ''}
+            onClick={() => setActiveTab('progress')}
+          >
+            Progress
+          </button>
+        </nav>
+
         <div className="status-pill">{statusBanner}</div>
       </header>
 
       <main className="workspace">
-        <section className="board-pane">
-          <Goban9x9
-            board={board}
-            currentTurn={currentTurn}
-            lastMove={lastMove && lastMove.row >= 0 ? lastMove : null}
-            lastBlackMove={lastBlackMove}
-            lastWhiteMove={lastWhiteMove}
-            koPoint={koPoint}
-            hints={hints}
-            selectedHintCoord={selectedHint?.move || null}
-            onIntersectionClick={handleIntersectionClick}
-            onHintClick={handleHintClick}
-            disabled={Boolean(gameResult) || aiThinking}
-          />
-        </section>
+        {activeTab === 'progress' ? (
+          <section className="progress-wide">
+            <div className="panel-card">
+              <h2>Dojo Milestone Telemetry (SQLite)</h2>
+              <div className="progress-grid">
+                <div className="capture-box">
+                  <span className="label">Estimated Rank</span>
+                  <span className="value" style={{ color: 'var(--accent)' }}>
+                    {progressStats.estimatedRank}
+                  </span>
+                </div>
+                <div className="capture-box">
+                  <span className="label">Drills Mastered</span>
+                  <span className="value">{progressStats.totalSolved}</span>
+                </div>
+                <div className="capture-box">
+                  <span className="label">Total Puzzle Reps</span>
+                  <span className="value">{progressStats.totalReps}</span>
+                </div>
+                <div className="capture-box">
+                  <span className="label">AI Match Wins</span>
+                  <span className="value">
+                    {progressStats.matchWins} / {progressStats.totalMatches}
+                  </span>
+                </div>
+              </div>
 
-        <aside className="control-pane">
-          <div className="panel-card">
-            <h2>Dojo Setup</h2>
-            <div className="sym-grid-2">
-              <button
-                className={vsAi ? 'active' : ''}
-                onClick={() => startFreshMatch({ nextVsAi: true })}
-                disabled={aiThinking}
-              >
-                AI Sensei
-              </button>
-              <button
-                className={!vsAi ? 'active' : ''}
-                onClick={() => startFreshMatch({ nextVsAi: false })}
-                disabled={aiThinking}
-              >
-                Local 2P
-              </button>
+              <h2>Skill Category Breakdown</h2>
+              <div className="sym-grid-2">
+                {puzzlePacks.map((pack) => {
+                  const catStats = progressStats.byCategory?.[
+                    pack.category
+                  ] || {
+                    solved: 0,
+                    reps: 0,
+                  };
+                  const totalInPack = pack.puzzles?.length || 0;
+                  return (
+                    <div key={pack.category} className="capture-box">
+                      <span className="label">{pack.title}</span>
+                      <span className="value" style={{ fontSize: '1rem' }}>
+                        {catStats.solved} / {totalInPack} Solved (
+                        {catStats.reps} reps)
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
-            {vsAi && (
-              <div className="sym-grid-2 mt-10">
-                <button
-                  className={humanColor === BLACK ? 'active' : ''}
-                  onClick={() => startFreshMatch({ nextHumanColor: BLACK })}
-                  disabled={aiThinking}
-                >
-                  Play Black
-                </button>
-                <button
-                  className={humanColor === WHITE ? 'active' : ''}
-                  onClick={() => startFreshMatch({ nextHumanColor: WHITE })}
-                  disabled={aiThinking}
-                >
-                  Play White
-                </button>
-              </div>
-            )}
+            <div className="panel-card mt-10">
+              <h2>Recent AI Match Results</h2>
+              {progressStats.recentMatches?.length === 0 ? (
+                <p className="muted">
+                  Complete a game (two consecutive passes) to record match
+                  telemetry here.
+                </p>
+              ) : (
+                <div className="move-log">
+                  {progressStats.recentMatches.map((m, i) => (
+                    <div key={i} className="log-entry">
+                      <span className="idx">#{i + 1}</span>
+                      <span>vs {m.opponent_rank.toUpperCase()}</span>
+                      <span>Played {m.human_color}</span>
+                      <span className="cap-tag">
+                        {m.winner} +{m.margin} ({m.moves_count} moves)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        ) : activeTab === 'dojo' ? (
+          <>
+            <section className="board-pane">
+              <Goban9x9
+                board={puzzleBoard}
+                currentTurn={currentPuzzle?.turn || BLACK}
+                lastMove={puzzleLastMove}
+                hints={hints}
+                selectedHintCoord={selectedHint?.move || null}
+                onIntersectionClick={handlePuzzleIntersectionClick}
+                onHintClick={handleHintClick}
+                disabled={puzzleSolved}
+              />
+            </section>
 
-            <div className="sym-grid-2 mt-10">
-              {vsAi && (
+            <aside className="control-pane">
+              <div className="panel-card">
+                <h2>Curriculum Pack</h2>
                 <label className="field-label">
-                  Sensei Rank
+                  Skill Module
                   <select
-                    value={aiRank}
-                    onChange={(e) => setAiRank(e.target.value)}
-                    disabled={aiThinking}
+                    value={activePackIdx}
+                    onChange={(e) => selectPuzzle(Number(e.target.value), 0)}
                   >
-                    {RANK_OPTIONS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>
-                        {opt.label}
+                    {puzzlePacks.map((pack, idx) => (
+                      <option key={pack.category} value={idx}>
+                        {pack.title}
                       </option>
                     ))}
                   </select>
                 </label>
-              )}
 
-              <label
-                className="field-label"
-                style={!vsAi ? { gridColumn: '1 / -1' } : undefined}
-              >
-                Komi / Handicap
-                <select
-                  value={handicapId}
-                  onChange={(e) =>
-                    startFreshMatch({ nextHandicapId: e.target.value })
-                  }
-                  disabled={aiThinking}
-                >
-                  {HANDICAP_OPTIONS.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </div>
-
-          <div className="panel-card">
-            <h2>Match Telemetry</h2>
-            <div className="turn-row">
-              <span
-                className={`stone-indicator ${currentTurn === BLACK ? 'black' : 'white'}`}
-              />
-              <strong>
-                {gameResult
-                  ? 'Match Complete'
-                  : aiThinking
-                    ? 'Sensei Reading...'
-                    : `${currentTurn === BLACK ? 'Black' : 'White'}'s Turn`}
-              </strong>
-              <span className="move-count">Move #{moveHistory.length + 1}</span>
-            </div>
-
-            <div className="sym-grid-2">
-              <div className="capture-box">
-                <span className="label">Black Captures</span>
-                <span className="value">{captures[BLACK]}</span>
-              </div>
-              <div className="capture-box">
-                <span className="label">White Captures</span>
-                <span className="value">{captures[WHITE]}</span>
-              </div>
-            </div>
-
-            <div className="sym-grid-4 mt-10">
-              <button
-                onClick={handleUndo}
-                disabled={moveHistory.length === 0 || aiThinking}
-                title="Undo"
-              >
-                &lt; Undo
-              </button>
-              <button
-                onClick={handleRedo}
-                disabled={redoStack.length === 0 || aiThinking}
-                title="Redo"
-              >
-                Redo &gt;
-              </button>
-              <button
-                onClick={handlePass}
-                disabled={Boolean(gameResult) || aiThinking}
-              >
-                Pass
-              </button>
-              <button
-                className="danger"
-                onClick={() => startFreshMatch()}
-                disabled={aiThinking}
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-
-          <div className="panel-card sensei-card">
-            <div className="sensei-header">
-              <h2>Sensei Coaching</h2>
-              {explanationData?.model && (
-                <span className="model-tag">{explanationData.model}</span>
-              )}
-            </div>
-
-            <div className="sym-grid-2">
-              <button
-                className={hints.length > 0 ? 'active' : ''}
-                onClick={handleRequestHints}
-                disabled={Boolean(gameResult) || aiThinking || senseiLoading}
-              >
-                {hints.length > 0 ? 'Refresh Hints' : 'Ask Sensei (4)'}
-              </button>
-              <button
-                onClick={handleExplainLastMove}
-                disabled={
-                  !lastMove || lastMove.row < 0 || aiThinking || senseiLoading
-                }
-              >
-                Explain Last
-              </button>
-            </div>
-
-            {hints.length > 0 && (
-              <div className="sym-grid-4 mt-10">
-                {hints.map((h) => (
-                  <button
-                    key={h.move}
-                    className={selectedHint?.move === h.move ? 'active' : ''}
-                    onClick={() => handleHintClick(h)}
-                    disabled={senseiLoading}
-                    title={`Winrate ${h.winrate}% (${h.scoreLead >= 0 ? '+' : ''}${h.scoreLead})`}
-                  >
-                    #{h.rank} {h.move}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            <div className="sensei-output mt-10">
-              {senseiLoading ? (
-                <p className="muted">
-                  Consulting {aiRank.toUpperCase()} Sensei via Ollama...
-                </p>
-              ) : explanationData ? (
-                <>
-                  <div className="explain-meta">
-                    <strong>Focus: {explanationData.move}</strong>
-                    {selectedHint && (
-                      <span>
-                        Win {selectedHint.winrate}% (
-                        {selectedHint.scoreLead >= 0 ? '+' : ''}
-                        {selectedHint.scoreLead})
-                      </span>
-                    )}
+                {currentPack && (
+                  <div className="sym-grid-4 mt-10">
+                    {currentPack.puzzles.map((p, idx) => {
+                      const isDone = progressStats.solvedIds?.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          className={activePuzzleIdx === idx ? 'active' : ''}
+                          onClick={() => selectPuzzle(activePackIdx, idx)}
+                        >
+                          #{idx + 1} {isDone ? '✓' : ''}
+                        </button>
+                      );
+                    })}
                   </div>
-                  <div className="explain-body">
-                    {renderFormattedSenseiText(explanationData.explanation)}
-                  </div>
-                  {selectedHint && (
-                    <button
-                      className="active mt-10"
-                      style={{ width: '100%' }}
-                      onClick={() =>
-                        handleIntersectionClick(
-                          selectedHint.row,
-                          selectedHint.col,
-                        )
-                      }
-                      disabled={Boolean(gameResult) || aiThinking}
-                    >
-                      Play Hint #{selectedHint.rank} ({selectedHint.move})
-                    </button>
-                  )}
-                </>
-              ) : (
-                <p className="muted">
-                  Click <strong>Ask Sensei (4)</strong> to project candidate
-                  silhouettes onto the board, then click any number to inspect
-                  its purpose.
-                </p>
-              )}
-            </div>
-          </div>
+                )}
+              </div>
 
-          <div className="panel-card history-card">
-            <h2>Move Log</h2>
-            <div className="move-log">
-              {moveHistory.length === 0 ? (
-                <p className="muted">No stones played yet.</p>
-              ) : (
-                [...moveHistory].reverse().map((m, revIdx) => {
-                  const moveNum = moveHistory.length - revIdx;
-                  return (
+              {currentPuzzle && (
+                <div className="panel-card">
+                  <div className="sensei-header">
+                    <h2>
+                      {currentPuzzle.title} ({currentPuzzle.rank.toUpperCase()})
+                    </h2>
+                    <span className="model-tag">
+                      {currentPuzzle.turn === BLACK
+                        ? 'Black to Play'
+                        : 'White to Play'}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.84rem', margin: '0 0 12px 0' }}>
+                    {currentPuzzle.prompt}
+                  </p>
+
+                  {puzzleFeedback && (
                     <div
-                      key={moveNum}
-                      className={`log-entry ${revIdx === 0 ? 'latest' : ''}`}
+                      className={`puzzle-feedback ${puzzleFeedback.solved ? 'solved' : 'retry'}`}
                     >
-                      <span className="idx">{moveNum}.</span>
-                      <span className="player">
-                        {m.color === BLACK ? 'B' : 'W'}
-                      </span>
-                      <span className="coord">{m.coord}</span>
-                      {m.captured > 0 && (
-                        <span className="cap-tag">+{m.captured} cap</span>
-                      )}
+                      <strong>
+                        {puzzleFeedback.solved ? '✓ Solved' : '✕ Retry'}(
+                        {puzzleFeedback.move}):{' '}
+                      </strong>
+                      {puzzleFeedback.text}
                     </div>
-                  );
-                })
+                  )}
+
+                  <div className="sym-grid-4 mt-10">
+                    <button onClick={() => stepPuzzle(-1)}>&lt; Prev</button>
+                    <button
+                      onClick={() =>
+                        selectPuzzle(activePackIdx, activePuzzleIdx)
+                      }
+                    >
+                      Retry
+                    </button>
+                    <button
+                      className={puzzleSolved ? 'active' : ''}
+                      onClick={() => stepPuzzle(1)}
+                      style={{ gridColumn: 'span 2' }}
+                    >
+                      Next Drill &gt;
+                    </button>
+                  </div>
+                </div>
               )}
-            </div>
-          </div>
-        </aside>
+
+              <div className="panel-card sensei-card">
+                <div className="sensei-header">
+                  <h2>Sensei Coaching</h2>
+                  {explanationData?.model && (
+                    <span className="model-tag">{explanationData.model}</span>
+                  )}
+                </div>
+
+                <div className="sym-grid-2">
+                  <button
+                    className={hints.length > 0 ? 'active' : ''}
+                    onClick={handleRequestHints}
+                    disabled={puzzleSolved || senseiLoading}
+                  >
+                    {hints.length > 0 ? 'Refresh Hints' : 'Ask Sensei (4)'}
+                  </button>
+                  <button
+                    onClick={clearCoaching}
+                    disabled={hints.length === 0 && !explanationData}
+                  >
+                    Clear Hints
+                  </button>
+                </div>
+
+                <div className="sensei-output mt-10">
+                  {senseiLoading ? (
+                    <p className="muted">Consulting Sensei via Ollama...</p>
+                  ) : explanationData ? (
+                    <>
+                      <div className="explain-meta">
+                        <strong>Focus: {explanationData.move}</strong>
+                      </div>
+                      <div className="explain-body">
+                        {renderFormattedSenseiText(explanationData.explanation)}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="muted">
+                      Stuck on a drill? Click <strong>Ask Sensei (4)</strong> to
+                      inspect candidate moves on the puzzle board.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </aside>
+          </>
+        ) : (
+          <>
+            <section className="board-pane">
+              <Goban9x9
+                board={board}
+                currentTurn={currentTurn}
+                lastMove={lastMove && lastMove.row >= 0 ? lastMove : null}
+                lastBlackMove={lastBlackMove}
+                lastWhiteMove={lastWhiteMove}
+                koPoint={koPoint}
+                hints={hints}
+                selectedHintCoord={selectedHint?.move || null}
+                onIntersectionClick={handleIntersectionClick}
+                onHintClick={handleHintClick}
+                disabled={Boolean(gameResult) || aiThinking}
+              />
+            </section>
+
+            <aside className="control-pane">
+              <div className="panel-card">
+                <h2>Dojo Setup</h2>
+                <div className="sym-grid-2">
+                  <button
+                    className={vsAi ? 'active' : ''}
+                    onClick={() => startFreshMatch({ nextVsAi: true })}
+                    disabled={aiThinking}
+                  >
+                    AI Sensei
+                  </button>
+                  <button
+                    className={!vsAi ? 'active' : ''}
+                    onClick={() => startFreshMatch({ nextVsAi: false })}
+                    disabled={aiThinking}
+                  >
+                    Local 2P
+                  </button>
+                </div>
+
+                {vsAi && (
+                  <div className="sym-grid-2 mt-10">
+                    <button
+                      className={humanColor === BLACK ? 'active' : ''}
+                      onClick={() => startFreshMatch({ nextHumanColor: BLACK })}
+                      disabled={aiThinking}
+                    >
+                      Play Black
+                    </button>
+                    <button
+                      className={humanColor === WHITE ? 'active' : ''}
+                      onClick={() => startFreshMatch({ nextHumanColor: WHITE })}
+                      disabled={aiThinking}
+                    >
+                      Play White
+                    </button>
+                  </div>
+                )}
+
+                <div className="sym-grid-2 mt-10">
+                  {vsAi && (
+                    <label className="field-label">
+                      Sensei Rank
+                      <select
+                        value={aiRank}
+                        onChange={(e) => setAiRank(e.target.value)}
+                        disabled={aiThinking}
+                      >
+                        {RANK_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+
+                  <label
+                    className="field-label"
+                    style={!vsAi ? { gridColumn: '1 / -1' } : undefined}
+                  >
+                    Komi / Handicap
+                    <select
+                      value={handicapId}
+                      onChange={(e) =>
+                        startFreshMatch({ nextHandicapId: e.target.value })
+                      }
+                      disabled={aiThinking}
+                    >
+                      {HANDICAP_OPTIONS.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div className="panel-card">
+                <h2>Match Telemetry</h2>
+                <div className="turn-row">
+                  <span
+                    className={`stone-indicator ${currentTurn === BLACK ? 'black' : 'white'}`}
+                  />
+                  <strong>
+                    {gameResult
+                      ? 'Match Complete'
+                      : aiThinking
+                        ? 'Sensei Reading...'
+                        : `${currentTurn === BLACK ? 'Black' : 'White'}'s Turn`}
+                  </strong>
+                  <span className="move-count">
+                    Move #{moveHistory.length + 1}
+                  </span>
+                </div>
+
+                <div className="sym-grid-2">
+                  <div className="capture-box">
+                    <span className="label">Black Captures</span>
+                    <span className="value">{captures[BLACK]}</span>
+                  </div>
+                  <div className="capture-box">
+                    <span className="label">White Captures</span>
+                    <span className="value">{captures[WHITE]}</span>
+                  </div>
+                </div>
+
+                <div className="sym-grid-4 mt-10">
+                  <button
+                    onClick={handleUndo}
+                    disabled={moveHistory.length === 0 || aiThinking}
+                    title="Undo"
+                  >
+                    &lt; Undo
+                  </button>
+                  <button
+                    onClick={handleRedo}
+                    disabled={redoStack.length === 0 || aiThinking}
+                    title="Redo"
+                  >
+                    Redo &gt;
+                  </button>
+                  <button
+                    onClick={handlePass}
+                    disabled={Boolean(gameResult) || aiThinking}
+                  >
+                    Pass
+                  </button>
+                  <button
+                    className="danger"
+                    onClick={() => startFreshMatch()}
+                    disabled={aiThinking}
+                  >
+                    Reset
+                  </button>
+                </div>
+              </div>
+
+              <div className="panel-card sensei-card">
+                <div className="sensei-header">
+                  <h2>Sensei Coaching</h2>
+                  {explanationData?.model && (
+                    <span className="model-tag">{explanationData.model}</span>
+                  )}
+                </div>
+
+                <div className="sym-grid-2">
+                  <button
+                    className={hints.length > 0 ? 'active' : ''}
+                    onClick={handleRequestHints}
+                    disabled={
+                      Boolean(gameResult) || aiThinking || senseiLoading
+                    }
+                  >
+                    {hints.length > 0 ? 'Refresh Hints' : 'Ask Sensei (4)'}
+                  </button>
+                  <button
+                    onClick={handleExplainLastMove}
+                    disabled={
+                      !lastMove ||
+                      lastMove.row < 0 ||
+                      aiThinking ||
+                      senseiLoading
+                    }
+                  >
+                    Explain Last
+                  </button>
+                </div>
+
+                {hints.length > 0 && (
+                  <div className="sym-grid-4 mt-10">
+                    {hints.map((h) => (
+                      <button
+                        key={h.move}
+                        className={
+                          selectedHint?.move === h.move ? 'active' : ''
+                        }
+                        onClick={() => handleHintClick(h)}
+                        disabled={senseiLoading}
+                        title={`Winrate ${h.winrate}% (${h.scoreLead >= 0 ? '+' : ''}${h.scoreLead})`}
+                      >
+                        #{h.rank} {h.move}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="sensei-output mt-10">
+                  {senseiLoading ? (
+                    <p className="muted">
+                      Consulting {aiRank.toUpperCase()} Sensei via Ollama...
+                    </p>
+                  ) : explanationData ? (
+                    <>
+                      <div className="explain-meta">
+                        <strong>Focus: {explanationData.move}</strong>
+                        {selectedHint && (
+                          <span>
+                            Win {selectedHint.winrate}% (
+                            {selectedHint.scoreLead >= 0 ? '+' : ''}
+                            {selectedHint.scoreLead})
+                          </span>
+                        )}
+                      </div>
+                      <div className="explain-body">
+                        {renderFormattedSenseiText(explanationData.explanation)}
+                      </div>
+                      {selectedHint && (
+                        <button
+                          className="active mt-10"
+                          style={{ width: '100%' }}
+                          onClick={() =>
+                            handleIntersectionClick(
+                              selectedHint.row,
+                              selectedHint.col,
+                            )
+                          }
+                          disabled={Boolean(gameResult) || aiThinking}
+                        >
+                          Play Hint #{selectedHint.rank} ({selectedHint.move})
+                        </button>
+                      )}
+                    </>
+                  ) : (
+                    <p className="muted">
+                      Click <strong>Ask Sensei (4)</strong> to project candidate
+                      silhouettes onto the board, then click any number to
+                      inspect its purpose.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="panel-card history-card">
+                <h2>Move Log</h2>
+                <div className="move-log">
+                  {moveHistory.length === 0 ? (
+                    <p className="muted">No stones played yet.</p>
+                  ) : (
+                    [...moveHistory].reverse().map((m, revIdx) => {
+                      const moveNum = moveHistory.length - revIdx;
+                      return (
+                        <div
+                          key={moveNum}
+                          className={`log-entry ${revIdx === 0 ? 'latest' : ''}`}
+                        >
+                          <span className="idx">{moveNum}.</span>
+                          <span className="player">
+                            {m.color === BLACK ? 'B' : 'W'}
+                          </span>
+                          <span className="coord">{m.coord}</span>
+                          {m.captured > 0 && (
+                            <span className="cap-tag">+{m.captured} cap</span>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </aside>
+          </>
+        )}
       </main>
     </div>
   );

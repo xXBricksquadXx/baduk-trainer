@@ -1,0 +1,111 @@
+{
+  "category": "01-opening",
+  "title": "01. Empty Board & Opening (30k–28k)",
+  "description": "Learn where to place your first stones on a 9x9 board: center influence, 3-3/3-4 corners, and avoiding slow 1st-line edges.",
+  "puzzles": [
+    {
+      "id": "open-01",
+      "title": "First Stone on a Blank 9x9",
+      "rank": "30k",
+      "prompt": "Blank 9x9 board. Play the highest-influence opening move that radiates power in all four directions.",
+      "turn": 1,
+      "stones": [],
+      "solutions": [
+        {
+          "move": "E5",
+          "reply": null,
+          "feedback": "Correct! E5 (Tengen) sits at the exact center of the 9x9 board, radiating influence toward every corner and side."
+        },
+        {
+          "move": "C3",
+          "reply": null,
+          "feedback": "Solid! The 3-3 star point immediately secures corner territory on a 9x9 board."
+        },
+        {
+          "move": "G7",
+          "reply": null,
+          "feedback": "Solid! The 3-3 star point immediately secures corner territory on a 9x9 board."
+        },
+        {
+          "move": "C7",
+          "reply": null,
+          "feedback": "Solid! The 3-3 star point immediately secures corner territory on a 9x9 board."
+        },
+        {
+          "move": "G3",
+          "reply": null,
+          "feedback": "Solid! The 3-3 star point immediately secures corner territory on a 9x9 board."
+        }
+      ],
+      "wrongHints": {
+        "default": "Too close to the edge or off-balance. On Move 1, claim the center (E5) or a 3-3 corner star point (C3, C7, G3, G7) where stones surround territory efficiently."
+      }
+    },
+    {
+      "id": "open-02",
+      "title": "Claiming an Open Corner",
+      "rank": "30k",
+      "prompt": "White opened at E5. Claim a 3-3 corner point to build a secure base of territory.",
+      "turn": 1,
+      "stones": [
+        { "coord": "E5", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "C3",
+          "reply": null,
+          "feedback": "Great! C3 stakes out the bottom-left corner cleanly instead of bumping head-on into White's center stone."
+        },
+        {
+          "move": "G7",
+          "reply": null,
+          "feedback": "Great! G7 stakes out the top-right corner cleanly."
+        },
+        {
+          "move": "C7",
+          "reply": null,
+          "feedback": "Great! C7 stakes out the top-left corner cleanly."
+        },
+        {
+          "move": "G3",
+          "reply": null,
+          "feedback": "Great! G3 stakes out the bottom-right corner cleanly."
+        }
+      ],
+      "wrongHints": {
+        "default": "Avoid attaching directly to White's center stone or crawling on the 1st/2nd line. Step into one of the four 3-3 corner star points (C3, C7, G3, G7)."
+      }
+    },
+    {
+      "id": "open-03",
+      "title": "The 3rd Line vs. 1st Line Rule",
+      "rank": "29k",
+      "prompt": "Black has C3 and White has G7. Extend along the 3rd line to build side territory without crawling on the edge.",
+      "turn": 1,
+      "stones": [
+        { "coord": "C3", "color": 1 },
+        { "coord": "G7", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "F3",
+          "reply": null,
+          "feedback": "Textbook 3rd-line extension! F3 builds a two-space wall along the bottom while aiming at the bottom-right corner."
+        },
+        {
+          "move": "C6",
+          "reply": null,
+          "feedback": "Textbook 3rd-line extension! C6 builds a two-space wall along the left side."
+        },
+        {
+          "move": "E5",
+          "reply": null,
+          "feedback": "Strong! Taking the center E5 links your corner stone to the rest of the board."
+        }
+      ],
+      "wrongHints": {
+        "default": "1st and 2nd line moves only secure 1 point per stone. Extend two spaces along the 3rd line (F3 or C6) or take the center (E5)."
+      }
+    }
+  ]
+}

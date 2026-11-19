@@ -1,8 +1,21 @@
+import json
 from sensei_agent import explain_move_with_sensei
 from typing import List, Optional, Tuple
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from pathlib import Path
+
+from go_rules import create_empty_board, from_coord
+from metrics_db import (
+    init_db,
+    record_puzzle_result,
+    record_match_result,
+    get_progress_summary,
+)
+
+PUZZLES_DIR = Path(__file__).parent / "puzzles"
+init_db()
 
 from go_rules import BOARD_SIZE, BLACK, WHITE, apply_move, to_coord
 from engine_bridge import (
@@ -141,3 +154,108 @@ async def explain_move(req: ExplainRequest):
         user_rank=req.rank,
     )
     return result
+
+
+class PuzzleAttemptRequest(BaseModel):
+    puzzleId: str
+    category: str
+    move: str
+
+
+class MatchRecordRequest(BaseModel):
+    opponentRank: str
+    humanColor: str
+    winner: str
+    margin: float
+    movesCount: int
+
+
+def _load_all_packs() -> List[dict]:
+    packs = []
+    if not PUZZLES_DIR.exists():
+        return packs
+    for fpath in sorted(PUZZLES_DIR.glob("*.json")):
+        with open(fpath, "r", encoding="utf-8") as f:
+            pack = json.load(f)
+            # Hydrate each puzzle with a ready-to-render 9x9 board matrix
+            for p in pack.get("puzzles", []):
+                b = create_empty_board()
+                for st in p.get("stones", []):
+                    rc = from_coord(st["coord"])
+                    if rc:
+                        b[rc[0]][rc[1]] = st["color"]
+                p["board"] = b
+            packs.append(pack)
+    return packs
+
+
+@app.get("/api/puzzles")
+def list_puzzles():
+    return {
+        "packs": _load_all_packs(),
+        "progress": get_progress_summary(),
+    }
+
+
+@app.post("/api/puzzles/attempt")
+def submit_puzzle_attempt(req: PuzzleAttemptRequest):
+    packs = _load_all_packs()
+    target_puzzle = None
+    for pack in packs:
+        for p in pack.get("puzzles", []):
+            if p["id"] == req.puzzleId:
+                target_puzzle = p
+                break
+        if target_puzzle:
+            break
+
+    if not target_puzzle:
+        raise HTTPException(status_code=404, detail="Puzzle not found")
+
+    move_upper = req.move.strip().upper()
+    matched = next(
+        (
+            s
+            for s in target_puzzle.get("solutions", [])
+            if s["move"].upper() == move_upper
+        ),
+        None,
+    )
+
+    if matched:
+        progress = record_puzzle_result(req.puzzleId, req.category, solved=True)
+        return {
+            "solved": True,
+            "feedback": matched["feedback"],
+            "reply": matched.get("reply"),
+            "progress": progress,
+        }
+
+    progress = record_puzzle_result(req.puzzleId, req.category, solved=False)
+    wrong_hints = target_puzzle.get("wrongHints", {})
+    feedback = wrong_hints.get(move_upper) or wrong_hints.get(
+        "default", "Not quite — re-read the liberties and shape, then try again."
+    )
+    return {
+        "solved": False,
+        "feedback": feedback,
+        "reply": None,
+        "progress": progress,
+    }
+
+
+@app.get("/api/metrics")
+def read_metrics():
+    return get_progress_summary()
+
+
+@app.post("/api/metrics/match")
+def save_match_metric(req: MatchRecordRequest):
+    progress = record_match_result(
+        opponent_rank=req.opponentRank,
+        human_color=req.humanColor,
+        winner=req.winner,
+        margin=req.margin,
+        moves_count=req.movesCount,
+    )
+    return {"progress": progress}

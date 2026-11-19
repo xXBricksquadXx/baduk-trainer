@@ -1,0 +1,53 @@
+{
+  "category": "03-shapes",
+  "title": "03. Cuts & Connections (25k–22k)",
+  "description": "Keep your own stones connected into one strong group while slicing through the opponent's weak points.",
+  "puzzles": [
+    {
+      "id": "shape-01",
+      "title": "Protect the Cutting Point",
+      "rank": "25k",
+      "prompt": "Black has a diagonal shape at D5 and E4. White is threatening to wedge between them. Connect solidly!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D5", "color": 1 },
+        { "coord": "E4", "color": 1 },
+        { "coord": "D4", "color": 2 },
+        { "coord": "F4", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "E5",
+          "reply": null,
+          "feedback": "Solid connection! Playing E5 turns two separate diagonal stones into a single unified 3-stone group with 6 liberties."
+        }
+      ],
+      "wrongHints": {
+        "default": "If White plays E5, your D5 and E4 stones get split apart. Occupy E5 yourself to link them into one unbreakable group."
+      }
+    },
+    {
+      "id": "shape-02",
+      "title": "Cut the Diagonal",
+      "rank": "24k",
+      "prompt": "White left two diagonal stones at E5 and F6 unprotected. Slice between them to split White into two weak groups!",
+      "turn": 1,
+      "stones": [
+        { "coord": "E5", "color": 2 },
+        { "coord": "F6", "color": 2 },
+        { "coord": "E6", "color": 1 },
+        { "coord": "D5", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "F5",
+          "reply": null,
+          "feedback": "Sharp cut! F5 links with your E6 stone and splits White's E5 and F6 stones apart, leaving E5 in Atari!"
+        }
+      ],
+      "wrongHints": {
+        "default": "Look at the empty intersection F5—it touches both of White's diagonal stones while connecting to your stone at E6."
+      }
+    }
+  ]
+}
