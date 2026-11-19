@@ -192,3 +192,122 @@ export function estimateAreaScore(board, komi = 6.5) {
     margin: Math.abs(diff),
   };
 }
+
+/**
+ * Maps every empty intersection to BLACK (1), WHITE (2), or 0 (neutral/contested)
+ * so the Goban can render a toggleable territory overlay.
+ */
+export function computeTerritoryMap(board) {
+  const territory = Array.from({ length: BOARD_SIZE }, () =>
+    Array(BOARD_SIZE).fill(0),
+  );
+  const visited = Array.from({ length: BOARD_SIZE }, () =>
+    Array(BOARD_SIZE).fill(false),
+  );
+
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      if (board[r][c] === EMPTY && !visited[r][c]) {
+        const region = [];
+        const borders = new Set();
+        const stack = [[r, c]];
+        visited[r][c] = true;
+
+        while (stack.length > 0) {
+          const [cr, cc] = stack.pop();
+          region.push([cr, cc]);
+          for (const [nr, nc] of getNeighbors(cr, cc)) {
+            const cell = board[nr][nc];
+            if (cell === EMPTY && !visited[nr][nc]) {
+              visited[nr][nc] = true;
+              stack.push([nr, nc]);
+            } else if (cell === BLACK || cell === WHITE) {
+              borders.add(cell);
+            }
+          }
+        }
+
+        const owner =
+          borders.size === 1 ? (borders.has(BLACK) ? BLACK : WHITE) : 0;
+        if (owner !== 0) {
+          for (const [rr, cc] of region) {
+            territory[rr][cc] = owner;
+          }
+        }
+      }
+    }
+  }
+  return territory;
+}
+
+/**
+ * Returns one liberty badge per connected stone group:
+ * [{ row, col, color, liberties, size }]
+ */
+export function computeChainLiberties(board) {
+  const visited = Array.from({ length: BOARD_SIZE }, () =>
+    Array(BOARD_SIZE).fill(false),
+  );
+  const chains = [];
+
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const color = board[r][c];
+      if (color !== EMPTY && !visited[r][c]) {
+        const { stones, liberties } = getGroupAndLiberties(board, r, c);
+        for (const [sr, sc] of stones) {
+          visited[sr][sc] = true;
+        }
+        // Anchor badge on the top-most / left-most stone of the chain
+        const sorted = [...stones].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+        const [anchorR, anchorC] = sorted[0];
+        chains.push({
+          row: anchorR,
+          col: anchorC,
+          color,
+          liberties,
+          size: stones.length,
+        });
+      }
+    }
+  }
+  return chains;
+}
+
+const SGF_ALPHA = 'abcdefghi';
+
+/**
+ * Serializes current match history into standard 9x9 Smart Game Format (.sgf).
+ */
+export function exportToSgf(moveHistory, komi = 6.5, handicapStones = 0) {
+  const header = `(;FF[4]GM[1]SZ[9]KM[${komi}]HA[${handicapStones}]AP[AI-Sensei-9x9]`;
+  const nodes = moveHistory.map((m) => {
+    const tag = m.color === BLACK ? 'B' : 'W';
+    if (m.row < 0 || m.col < 0) return `;${tag}[]`;
+    return `;${tag}[${SGF_ALPHA[m.col]}${SGF_ALPHA[m.row]}]`;
+  });
+  return `${header}${nodes.join('')})`;
+}
+
+/**
+ * Parses a 9x9 SGF string into an array of { color, row, col, coord } moves.
+ */
+export function parseSgfMoves(sgfText) {
+  const moves = [];
+  const tokenRegex = /;([BW])\[([a-i]{0,2})\]/gi;
+  let match;
+  while ((match = tokenRegex.exec(sgfText)) !== null) {
+    const color = match[1].toUpperCase() === 'B' ? BLACK : WHITE;
+    const raw = match[2].toLowerCase();
+    if (raw.length === 2) {
+      const col = SGF_ALPHA.indexOf(raw[0]);
+      const row = SGF_ALPHA.indexOf(raw[1]);
+      if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
+        moves.push({ color, row, col, coord: toCoordString(row, col) });
+      }
+    } else {
+      moves.push({ color, row: -1, col: -1, coord: 'PASS' });
+    }
+  }
+  return moves;
+}

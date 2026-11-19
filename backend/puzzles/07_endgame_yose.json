@@ -1,0 +1,83 @@
+{
+  "category": "07-endgame-yose",
+  "title": "07. College: Endgame & Borders (17k–12k)",
+  "description": "Seal open territory boundaries (Yose) before passing so the opponent cannot sneak into your corner.",
+  "puzzles": [
+    {
+      "id": "yose-01",
+      "title": "Seal the 2nd-Line Monkey Jump",
+      "rank": "17k",
+      "concept": "Before passing at the end of a game, scan every border between Black and White walls. An open gap on the 1st or 2nd line lets the opponent slide deep into your territory.",
+      "prompt": "Late endgame: Black controls the left side and White controls the right, but one border gap remains open. Seal your territory before passing!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D9", "color": 1 },
+        { "coord": "D8", "color": 1 },
+        { "coord": "D7", "color": 1 },
+        { "coord": "D6", "color": 1 },
+        { "coord": "D5", "color": 1 },
+        { "coord": "D4", "color": 1 },
+        { "coord": "D3", "color": 1 },
+        { "coord": "D2", "color": 1 },
+        { "coord": "E9", "color": 2 },
+        { "coord": "E8", "color": 2 },
+        { "coord": "E7", "color": 2 },
+        { "coord": "E6", "color": 2 },
+        { "coord": "E5", "color": 2 },
+        { "coord": "E4", "color": 2 },
+        { "coord": "E3", "color": 2 },
+        { "coord": "E2", "color": 2 },
+        { "coord": "F1", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "D1",
+          "reply": null,
+          "feedback": "Clean border seal! D1 closes the 1st-line gate—if you had passed, White could have played D1 and C1 to erase 4+ points of your territory."
+        },
+        {
+          "move": "E1",
+          "reply": null,
+          "feedback": "Strong endgame Hane! Pushing to E1 seals the border AND gains an extra point while forcing White to defend."
+        }
+      ],
+      "wrongHints": {
+        "default": "Follow the vertical wall down to the bottom edge—D2 and E2 end at the 2nd line, leaving the 1st-line gate (D1/E1) wide open!"
+      }
+    },
+    {
+      "id": "yose-02",
+      "title": "Defend the Cutting Dame",
+      "rank": "14k",
+      "concept": "Never pass while one of your boundary stones has only 1 or 2 liberties next to an opponent's wall—connect your weak joint first.",
+      "prompt": "White threatens to push through your diagonal wall at E5. Connect the last boundary point so your entire left territory is watertight!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D7", "color": 1 },
+        { "coord": "D6", "color": 1 },
+        { "coord": "E6", "color": 1 },
+        { "coord": "D4", "color": 1 },
+        { "coord": "D3", "color": 1 },
+        { "coord": "F6", "color": 2 },
+        { "coord": "F5", "color": 2 },
+        { "coord": "E4", "color": 2 },
+        { "coord": "E3", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "D5",
+          "reply": null,
+          "feedback": "Watertight! D5 links your top and bottom walls into one solid border so White cannot cut into D4."
+        },
+        {
+          "move": "E5",
+          "reply": null,
+          "feedback": "Strong block! E5 stops White's push and keeps your diagonal wall completely connected."
+        }
+      ],
+      "wrongHints": {
+        "default": "Look at the gap between E6 and D4—White is ready to wedge into E5/D5 and shatter your wall."
+      }
+    }
+  ]
+}

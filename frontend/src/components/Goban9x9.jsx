@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { BOARD_SIZE, BLACK, WHITE, EMPTY, COL_LABELS } from '../utils/goLogic';
 
-// Star points (hoshi) on a 9x9 board: (2,2), (2,6), (4,4) tengen, (6,2), (6,6)
 const STAR_POINTS = [
   [2, 2],
   [2, 6],
@@ -16,9 +15,11 @@ export default function Goban9x9({
   lastMove,
   lastBlackMove = null,
   lastWhiteMove = null,
-  koPoint,
-  hints = [], // [{ row, col, rank, move, winrate, scoreLead }]
+  koPoint = null,
+  hints = [],
   selectedHintCoord = null,
+  territoryMap = null,
+  chainLiberties = [],
   onIntersectionClick,
   onHintClick,
   disabled = false,
@@ -177,6 +178,32 @@ export default function Goban9x9({
           );
         })}
 
+        {/* Toggleable Territory Ownership Overlay */}
+        {territoryMap &&
+          territoryMap.map((rowArr, r) =>
+            rowArr.map((owner, c) => {
+              if (owner === 0 || board[r][c] !== EMPTY) return null;
+              const { x, y } = getXY(r, c);
+              const isB = owner === BLACK;
+              return (
+                <rect
+                  key={`terr-${r}-${c}`}
+                  x={x - 11}
+                  y={y - 11}
+                  width="22"
+                  height="22"
+                  rx="4"
+                  fill={
+                    isB ? 'rgba(15, 17, 21, 0.68)' : 'rgba(255, 255, 255, 0.82)'
+                  }
+                  stroke={isB ? '#eab308' : '#334155'}
+                  strokeWidth="1.4"
+                  pointerEvents="none"
+                />
+              );
+            }),
+          )}
+
         {/* Ko Forbidden Square Indicator */}
         {koPoint &&
           (() => {
@@ -239,9 +266,49 @@ export default function Goban9x9({
           }),
         )}
 
+        {/* Toggleable Chain Liberties Badges */}
+        {chainLiberties.map((ch) => {
+          const { x, y } = getXY(ch.row, ch.col);
+          const badgeBg =
+            ch.liberties === 1
+              ? '#dc2626'
+              : ch.liberties === 2
+                ? '#d97706'
+                : '#0f172a';
+          const badgeStroke =
+            ch.liberties === 1
+              ? '#fecaca'
+              : ch.liberties === 2
+                ? '#fef08a'
+                : '#38bdf8';
+          return (
+            <g
+              key={`lib-${ch.row}-${ch.col}`}
+              pointerEvents="none"
+              transform={`translate(${x + 14}, ${y - 14})`}
+            >
+              <circle
+                r="10.5"
+                fill={badgeBg}
+                stroke={badgeStroke}
+                strokeWidth="1.6"
+              />
+              <text
+                y="3.8"
+                fontSize="11"
+                fontWeight="800"
+                fill="#ffffff"
+                textAnchor="middle"
+              >
+                {ch.liberties > 9 ? '9+' : ch.liberties}
+              </text>
+            </g>
+          );
+        })}
+
         {/* Hint Silhouettes (Rank 1-4 clickable overlays) */}
         {hints.map((hint) => {
-          if (board[hint.row][hint.col] !== EMPTY) return null;
+          if (board[hint.row]?.[hint.col] !== EMPTY) return null;
           const { x, y } = getXY(hint.row, hint.col);
           const isSelected = selectedHintCoord === hint.move;
           return (

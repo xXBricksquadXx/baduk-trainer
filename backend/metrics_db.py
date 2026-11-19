@@ -214,16 +214,30 @@ def get_progress_summary() -> Dict[str, Any]:
                 by_category[cat]["firstTry"] += 1
             by_category[cat]["reps"] += r["attempts"]
 
-        matches = conn.execute("""
+        # All-time SQLite match aggregation (scales cleanly to 50+ / 500+ games)
+        agg = conn.execute("""
+            SELECT
+                COUNT(*) AS total_matches,
+                COALESCE(SUM(CASE WHEN LOWER(winner) = LOWER(human_color) THEN 1 ELSE 0 END), 0) AS total_wins,
+                COALESCE(ROUND(AVG(CASE WHEN LOWER(winner) = LOWER(human_color) THEN margin END), 1), 0.0) AS avg_win_margin
+            FROM match_history
+            """).fetchone()
+
+        total_matches = int(agg["total_matches"])
+        total_wins = int(agg["total_wins"])
+        avg_win_margin = float(agg["avg_win_margin"])
+        win_rate = (
+            round((total_wins / total_matches) * 100, 1) if total_matches > 0 else 0.0
+        )
+
+        # Last 10 matches for clean UI display
+        recent_matches = conn.execute("""
             SELECT opponent_rank, human_color, winner, margin, moves_count, rank_delta, played_at
             FROM match_history
             ORDER BY id DESC
-            LIMIT 20
+            LIMIT 10
             """).fetchall()
 
-        wins = sum(
-            1 for m in matches if m["winner"].lower() == m["human_color"].lower()
-        )
         accuracy = round((first_try_count / len(solved_ids)) * 100) if solved_ids else 0
 
         return {
@@ -233,9 +247,11 @@ def get_progress_summary() -> Dict[str, Any]:
             "firstTryAccuracy": accuracy,
             "totalReps": total_reps,
             "byCategory": by_category,
-            "recentMatches": [dict(m) for m in matches],
-            "totalMatches": len(matches),
-            "matchWins": wins,
+            "recentMatches": [dict(m) for m in recent_matches],
+            "totalMatches": total_matches,
+            "matchWins": total_wins,
+            "winRate": win_rate,
+            "avgWinMargin": avg_win_margin,
             "numericRank": curr_rank,
             "estimatedRank": _format_numeric_rank(curr_rank),
         }

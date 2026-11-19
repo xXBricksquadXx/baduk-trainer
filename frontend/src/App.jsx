@@ -8,6 +8,10 @@ import {
   toCoordString,
   fromCoordString,
   estimateAreaScore,
+  computeTerritoryMap,
+  computeChainLiberties,
+  exportToSgf,
+  parseSgfMoves,
 } from './utils/goLogic';
 import './App.css';
 
@@ -76,7 +80,7 @@ export default function App() {
   const [senseiLoading, setSenseiLoading] = useState(false);
   const [explanationData, setExplanationData] = useState(null);
 
-  // Milestone 4: Puzzle Dojo & SQLite Progress Telemetry
+  // Milestone 4 & 5: Puzzle Dojo & SQLite Progress Telemetry
   const [activeTab, setActiveTab] = useState('match'); // 'match' | 'dojo' | 'progress'
   const [puzzlePacks, setPuzzlePacks] = useState([]);
   const [activePackIdx, setActivePackIdx] = useState(0);
@@ -89,13 +93,20 @@ export default function App() {
   const [progressStats, setProgressStats] = useState({
     solvedIds: [],
     totalSolved: 0,
+    firstTryAccuracy: 0,
     totalReps: 0,
     byCategory: {},
     recentMatches: [],
     totalMatches: 0,
     matchWins: 0,
-    estimatedRank: '30 Kyu',
+    winRate: 0,
+    avgWinMargin: 0,
+    estimatedRank: '30.0 Kyu',
   });
+
+  // Milestone 6: Goban Visual Overlays
+  const [showTerritory, setShowTerritory] = useState(false);
+  const [showLiberties, setShowLiberties] = useState(false);
 
   const activeHandicap =
     HANDICAP_OPTIONS.find((h) => h.id === handicapId) || HANDICAP_OPTIONS[0];
@@ -111,6 +122,14 @@ export default function App() {
     activeTab === 'match'
       ? estimateAreaScore(board, activeHandicap.komi)
       : null;
+
+  const activeBoardForOverlay = activeTab === 'dojo' ? puzzleBoard : board;
+  const territoryOverlay = showTerritory
+    ? computeTerritoryMap(activeBoardForOverlay)
+    : null;
+  const libertiesOverlay = showLiberties
+    ? computeChainLiberties(activeBoardForOverlay)
+    : [];
 
   useEffect(() => {
     fetch(`${API_BASE}/health`)
@@ -476,6 +495,107 @@ export default function App() {
     setStatusBanner(`Restored to ${latestRestored.coord}.`);
   };
 
+  const handleExportSgf = () => {
+    const sgf = exportToSgf(
+      moveHistory,
+      activeHandicap.komi,
+      activeHandicap.stones,
+    );
+    const blob = new Blob([sgf], { type: 'application/x-go-sgf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ai-sensei-9x9-move-${moveHistory.length}.sgf`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setStatusBanner(`Exported ${moveHistory.length}-move game to SGF.`);
+  };
+
+  const handleImportSgfFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const parsed = parseSgfMoves(String(reader.result || ''));
+      if (parsed.length === 0) {
+        setStatusBanner('No valid 9x9 moves found in SGF file.');
+        return;
+      }
+      let simBoard = createInitialBoard(0);
+      let simTurn = BLACK;
+      let simKo = null;
+      const simCaps = { [BLACK]: 0, [WHITE]: 0 };
+      const rebuiltHistory = [];
+
+      for (const m of parsed) {
+        if (m.row < 0) {
+          const nextT = m.color === BLACK ? WHITE : BLACK;
+          rebuiltHistory.push({
+            board: simBoard,
+            nextBoard: simBoard,
+            currentTurn: m.color,
+            nextTurn: nextT,
+            captures: { ...simCaps },
+            nextCaptures: { ...simCaps },
+            koPoint: simKo,
+            nextKoPoint: null,
+            row: -1,
+            col: -1,
+            coord: 'PASS',
+            color: m.color,
+            captured: 0,
+          });
+          simKo = null;
+          simTurn = nextT;
+        } else {
+          const res = applyMove(simBoard, m.row, m.col, m.color, simKo);
+          if (!res.valid) break;
+          const nextCaps = {
+            ...simCaps,
+            [m.color]: simCaps[m.color] + res.capturedCount,
+          };
+          const nextT = m.color === BLACK ? WHITE : BLACK;
+          rebuiltHistory.push({
+            board: simBoard,
+            nextBoard: res.board,
+            currentTurn: m.color,
+            nextTurn: nextT,
+            captures: { ...simCaps },
+            nextCaptures: nextCaps,
+            koPoint: simKo,
+            nextKoPoint: res.koPoint,
+            row: m.row,
+            col: m.col,
+            coord: m.coord,
+            color: m.color,
+            captured: res.capturedCount,
+          });
+          simBoard = res.board;
+          simKo = res.koPoint;
+          simCaps[BLACK] = nextCaps[BLACK];
+          simCaps[WHITE] = nextCaps[WHITE];
+          simTurn = nextT;
+        }
+      }
+
+      clearCoaching();
+      setVsAi(false);
+      setBoard(simBoard);
+      setCurrentTurn(simTurn);
+      setCaptures(simCaps);
+      setKoPoint(simKo);
+      setMoveHistory(rebuiltHistory);
+      setRedoStack([]);
+      setGameResult(null);
+      setActiveTab('match');
+      setStatusBanner(
+        `Loaded ${rebuiltHistory.length} moves from ${file.name} (Local 2P / Sensei Review mode).`,
+      );
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   const requestHintExplanation = async (
     targetBoard,
     targetColor,
@@ -712,6 +832,43 @@ export default function App() {
     selectPuzzle(activePackIdx, nextIdx);
   };
 
+  const renderOverlayStrip = () => (
+    <div className="overlay-strip">
+      <button
+        className={showTerritory ? 'active' : ''}
+        onClick={() => setShowTerritory((v) => !v)}
+        title="Highlight surrounded Black and White territory regions"
+      >
+        Territory: {showTerritory ? 'ON' : 'OFF'}
+      </button>
+      <button
+        className={showLiberties ? 'active' : ''}
+        onClick={() => setShowLiberties((v) => !v)}
+        title="Show remaining liberties on every connected stone chain"
+      >
+        Liberties: {showLiberties ? 'ON' : 'OFF'}
+      </button>
+      {activeTab === 'match' ? (
+        <button
+          onClick={handleExportSgf}
+          disabled={moveHistory.length === 0}
+          title="Download current game as a standard .sgf file"
+        >
+          Export SGF
+        </button>
+      ) : (
+        <button
+          onClick={() => {
+            setShowTerritory(false);
+            setShowLiberties(false);
+          }}
+        >
+          Clear Overlays
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div className="app-shell">
       <header className="top-bar">
@@ -775,7 +932,28 @@ export default function App() {
         {activeTab === 'progress' ? (
           <section className="progress-wide">
             <div className="panel-card">
-              <h2>Dojo Milestone Telemetry (SQLite)</h2>
+              <div className="sensei-header">
+                <h2>Dojo Milestone Telemetry (SQLite)</h2>
+                <label
+                  style={{
+                    cursor: 'pointer',
+                    padding: '6px 12px',
+                    background: '#252a34',
+                    border: '1px solid #363d4c',
+                    borderRadius: '6px',
+                    fontSize: '0.78rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  Import SGF Game
+                  <input
+                    type="file"
+                    accept=".sgf"
+                    onChange={handleImportSgfFile}
+                    style={{ display: 'none' }}
+                  />
+                </label>
+              </div>
               <div className="progress-grid">
                 <div className="capture-box">
                   <span className="label">Estimated Rank</span>
@@ -792,9 +970,10 @@ export default function App() {
                   <span className="value">{progressStats.totalReps}</span>
                 </div>
                 <div className="capture-box">
-                  <span className="label">AI Match Wins</span>
+                  <span className="label">All-Time Win Rate</span>
                   <span className="value">
-                    {progressStats.matchWins} / {progressStats.totalMatches}
+                    {progressStats.matchWins} / {progressStats.totalMatches} (
+                    {progressStats.winRate ?? 0}%)
                   </span>
                 </div>
               </div>
@@ -823,7 +1002,7 @@ export default function App() {
             </div>
 
             <div className="panel-card mt-10">
-              <h2>Recent AI Match Results</h2>
+              <h2>Last 10 AI Match Results</h2>
               {progressStats.recentMatches?.length === 0 ? (
                 <p className="muted">
                   Complete a game (two consecutive passes) to record match
@@ -854,10 +1033,13 @@ export default function App() {
                 lastMove={puzzleLastMove}
                 hints={hints}
                 selectedHintCoord={selectedHint?.move || null}
+                territoryMap={territoryOverlay}
+                chainLiberties={libertiesOverlay}
                 onIntersectionClick={handlePuzzleIntersectionClick}
                 onHintClick={handleHintClick}
                 disabled={puzzleSolved}
               />
+              {renderOverlayStrip()}
             </section>
 
             <aside className="control-pane">
@@ -908,6 +1090,24 @@ export default function App() {
                         : 'White to Play'}
                     </span>
                   </div>
+
+                  {currentPuzzle.concept && (
+                    <div
+                      style={{
+                        background: 'rgba(234, 179, 8, 0.08)',
+                        borderLeft: '3px solid var(--accent)',
+                        padding: '7px 10px',
+                        borderRadius: '4px',
+                        fontSize: '0.78rem',
+                        color: '#fef08a',
+                        marginBottom: '10px',
+                        lineHeight: 1.4,
+                      }}
+                    >
+                      <strong>Sensei Principle:</strong> {currentPuzzle.concept}
+                    </div>
+                  )}
+
                   <p style={{ fontSize: '0.84rem', margin: '0 0 12px 0' }}>
                     {currentPuzzle.prompt}
                   </p>
@@ -1004,10 +1204,13 @@ export default function App() {
                 koPoint={koPoint}
                 hints={hints}
                 selectedHintCoord={selectedHint?.move || null}
+                territoryMap={territoryOverlay}
+                chainLiberties={libertiesOverlay}
                 onIntersectionClick={handleIntersectionClick}
                 onHintClick={handleHintClick}
                 disabled={Boolean(gameResult) || aiThinking}
               />
+              {renderOverlayStrip()}
             </section>
 
             <aside className="control-pane">

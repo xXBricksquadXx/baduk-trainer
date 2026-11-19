@@ -1,0 +1,91 @@
+{
+  "category": "06-ladders-nets",
+  "title": "06. College: Ladders & Nets (20k–16k)",
+  "description": "Read multi-move zigzag chases (Shicho) and loose surrounding nets (Geta) that trap cutting stones cleanly.",
+  "puzzles": [
+    {
+      "id": "college-01",
+      "title": "The Loose Net (Geta)",
+      "rank": "20k",
+      "concept": "When a direct Atari lets the enemy stone push out into open space, step back one knight's-move diagonal (a Net) to block both escape lanes at once.",
+      "prompt": "White's cutting stone at E5 has 3 liberties (E6, F5, E4). Don't push it from behind—cast a loose net to trap it!",
+      "turn": 1,
+      "stones": [
+        { "coord": "E5", "color": 2 },
+        { "coord": "D5", "color": 1 },
+        { "coord": "D6", "color": 1 },
+        { "coord": "E4", "color": 1 },
+        { "coord": "G6", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "F6",
+          "reply": null,
+          "feedback": "Textbook Net (Geta)! F6 hovers one diagonal step ahead—whether White pushes to E6 or F5, your surrounding stones cut off every exit."
+        }
+      ],
+      "wrongHints": {
+        "E6": "Direct Atari at E6 lets White extend to F5 and break straight through your stones!",
+        "F5": "Direct Atari at F5 lets White extend upward to E6 into open territory!",
+        "default": "Avoid touching E5 directly—step to F6 to form a loose net covering both E6 and F5."
+      }
+    },
+    {
+      "id": "college-02",
+      "title": "2-Step Ladder (Shicho) to the Edge",
+      "rank": "18k",
+      "concept": "A Ladder (Shicho) keeps the enemy group permanently at 1 liberty in a diagonal staircase until it hits the edge of the board.",
+      "prompt": "White's stone at D6 has 2 liberties (D7 and E6). Start a diagonal ladder driving White toward the top edge!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D6", "color": 2 },
+        { "coord": "C6", "color": 1 },
+        { "coord": "D5", "color": 1 },
+        { "coord": "E5", "color": 1 }
+      ],
+      "steps": [
+        {
+          "move": "E6",
+          "reply": "D7",
+          "feedback": "Step 1 complete! E6 forces White upward to D7 (2 liberties left: C7 and E7). Keep the staircase tight!"
+        },
+        {
+          "move": "C7",
+          "reply": null,
+          "feedback": "Step 2 complete! C7 drives White onto E7 where the 8th/9th-line top edge crushes its remaining liberties."
+        }
+      ],
+      "wrongHints": {
+        "D7": "Playing D7 first lets White escape horizontally to E6 with 3 liberties!",
+        "default": "Keep White in continuous Atari toward the top edge: play E6 first, then C7 after White extends to D7."
+      }
+    },
+    {
+      "id": "college-03",
+      "title": "Snapback Sacrifice",
+      "rank": "16k",
+      "concept": "Sometimes playing inside an enemy pocket lets them capture 1 stone—only for their own capturing group to drop to 1 liberty so you immediately recapture the whole chain.",
+      "prompt": "White's 3 corner stones (A8, B8, B9) threaten to connect. Sacrifice a single stone to trigger a Snapback recapture!",
+      "turn": 1,
+      "stones": [
+        { "coord": "A8", "color": 2 },
+        { "coord": "B8", "color": 2 },
+        { "coord": "B9", "color": 2 },
+        { "coord": "A7", "color": 1 },
+        { "coord": "B7", "color": 1 },
+        { "coord": "C8", "color": 1 },
+        { "coord": "C9", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "A9",
+          "reply": null,
+          "feedback": "Brilliant! Playing A9 puts White's 3 stones into Atari—even if White captures A9, their 3 stones sit in the corner with 1 liberty at A9 for an instant Snapback!"
+        }
+      ],
+      "wrongHints": {
+        "default": "Look at the empty corner point A9—occupying it reduces White's entire 3-stone corner group to 1 liberty."
+      }
+    }
+  ]
+}
