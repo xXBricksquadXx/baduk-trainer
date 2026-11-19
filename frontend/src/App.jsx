@@ -716,7 +716,7 @@ export default function App() {
     <div className="app-shell">
       <header className="top-bar">
         <div className="brand">
-          <span className="brand-dot" />
+          <img src="/logo.jpg" alt="AI Sensei 9x9" className="brand-logo" />
           <h1>AI Sensei 9x9</h1>
           {liveAdvantage && (
             <span
