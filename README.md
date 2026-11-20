@@ -9,7 +9,7 @@ An interactive 9x9 Go (Baduk) trainer pairing a calibrated 30 Kyu – 1 Dan engi
 ## Demo Walkthrough
 
 <div align="center">
-  <video src="https://github.com/user-attachments/assets/e904ebe9-c522-4089-a09d-e331189f7876" width="100%" controls autoplay loop muted></video>
+  <video src="https://github.com/user-attachments/assets/1b1e3d7f-74ef-4450-ba9e-8e09875fb0d7" width="100%" controls autoplay loop muted></video>
 </div>
 
 ---
