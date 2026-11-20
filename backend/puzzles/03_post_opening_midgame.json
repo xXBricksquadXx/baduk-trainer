@@ -93,6 +93,96 @@
       "wrongHints": {
         "default": "Keep White trapped in the corner: block above at B4 first, then seal the right side at D3."
       }
+    },
+    {
+      "id": "mid-04",
+      "title": "Turn Influence Into Territory",
+      "rank": "24k",
+      "concept": "A central wall (thickness) only scores points when you plant a stone on the open side it faces.",
+      "prompt": "You built a strong central wall (D5-E5-E6) while White sits in the corners (C3, G7). Expand your right-side framework!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D5", "color": 1 },
+        { "coord": "E5", "color": 1 },
+        { "coord": "E6", "color": 1 },
+        { "coord": "C3", "color": 2 },
+        { "coord": "G7", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "G4",
+          "reply": null,
+          "feedback": "Great framework! G4 works together with your E5-E6 wall to enclose the right side and bottom-right."
+        },
+        {
+          "move": "F3",
+          "reply": null,
+          "feedback": "Strong! F3 anchors the bottom-right and links up with your central E5 wall."
+        }
+      ],
+      "wrongHints": {
+        "default": "Your central wall faces the wide-open right/bottom-right quadrant—plant a stone at G4 or F3 to turn influence into territory."
+      }
+    },
+    {
+      "id": "mid-05",
+      "title": "Rescue Your Pinned Side Group",
+      "rank": "23k",
+      "concept": "When a group is pinned against the edge without eyes, extend along the 3rd line to gain liberties and base space.",
+      "prompt": "Your two stones at G4-G5 are pinned against the right edge by White (F4, F5, G6). Extend to gain breathing room!",
+      "turn": 1,
+      "stones": [
+        { "coord": "G4", "color": 1 },
+        { "coord": "G5", "color": 1 },
+        { "coord": "F4", "color": 2 },
+        { "coord": "F5", "color": 2 },
+        { "coord": "G6", "color": 2 },
+        { "coord": "C5", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "G3",
+          "reply": null,
+          "feedback": "Solid downward extension! G3 increases your chain liberties from 3 to 5 and opens a path toward the bottom-right corner."
+        },
+        {
+          "move": "H4",
+          "reply": null,
+          "feedback": "Good eye-making shape! H4 secures 2nd-line base room along the right edge."
+        }
+      ],
+      "wrongHints": {
+        "default": "Your G4-G5 stones are blocked above at G6 and left at F4-F5—extend downward to G3 to gain liberties!"
+      }
+    },
+    {
+      "id": "mid-06",
+      "title": "Split Two Weak Enemy Stones",
+      "rank": "22k",
+      "concept": "When the opponent leaves two stones separated across a side without a base, drive a wedge between them so they cannot connect.",
+      "prompt": "White has isolated stones at C6 and G6 with no base. Play the splitting point in the middle!",
+      "turn": 1,
+      "stones": [
+        { "coord": "C6", "color": 2 },
+        { "coord": "G6", "color": 2 },
+        { "coord": "D4", "color": 1 },
+        { "coord": "F4", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "E6",
+          "reply": null,
+          "feedback": "Clean split! E6 separates C6 and G6 while linking naturally with your D4-F4 stones below."
+        },
+        {
+          "move": "E5",
+          "reply": null,
+          "feedback": "Strong central cap! E5 keeps both White stones separated and under pressure."
+        }
+      ],
+      "wrongHints": {
+        "default": "Drive straight up the middle between C6 and G6 (play E6 or E5) so White cannot connect across the top."
+      }
     }
   ]
 }

@@ -48,6 +48,104 @@
       "wrongHints": {
         "default": "Look at the empty intersection F5—it touches both of White's diagonal stones while connecting to your stone at E6."
       }
+    },
+    {
+      "id": "shape-03",
+      "title": "Form the Tiger's Mouth",
+      "rank": "23k",
+      "concept": "A Tiger's Mouth is a 3-stone jaw whose open mouth cannot be entered by the opponent without putting themselves in instant Atari.",
+      "prompt": "You hold D5 and E6 while White presses at E4. Complete a Tiger's Mouth so White cannot wedge between your stones!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D5", "color": 1 },
+        { "coord": "E6", "color": 1 },
+        { "coord": "E4", "color": 2 },
+        { "coord": "F5", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "D6",
+          "reply": null,
+          "feedback": "Textbook Tiger's Mouth! D5-D6-E6 forms a jaw around E5—if White ever plays E5, you capture it immediately!"
+        }
+      ],
+      "wrongHints": {
+        "E5": "E5 creates a heavy Empty Triangle with fewer liberties—play D6 instead to form an efficient Tiger's Mouth!",
+        "default": "Play D6 to create a 3-stone Tiger's Mouth guarding E5 with maximum liberties."
+      }
+    },
+    {
+      "id": "shape-04",
+      "title": "Unbreakable Bamboo Joint",
+      "rank": "22k",
+      "concept": "Two parallel 2-stone pillars separated by 1 space form a Bamboo Joint—neither middle point can be cut because the other immediately connects.",
+      "prompt": "You hold D6-D5 on the left and F6-F5 on the right. White peeps at E6 trying to cut. Complete the Bamboo Joint!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D6", "color": 1 },
+        { "coord": "D5", "color": 1 },
+        { "coord": "F6", "color": 1 },
+        { "coord": "F5", "color": 1 },
+        { "coord": "E6", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "E5",
+          "reply": null,
+          "feedback": "Rock solid! E5 links all five stones into a single 8-liberty fortress and leaves White's E6 peep isolated."
+        }
+      ],
+      "wrongHints": {
+        "default": "Connect across the bottom of the two pillars at E5 so White's E6 stone cannot slice through."
+      }
+    },
+    {
+      "id": "shape-05",
+      "title": "Hanging Connection",
+      "rank": "22k",
+      "concept": "When a diagonal pair is threatened from one side, stepping into the adjacent knight's-move anchor links both stones while expanding outward.",
+      "prompt": "Your stones at D6 and E5 are threatened by White at D5. Connect cleanly toward the center!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D6", "color": 1 },
+        { "coord": "E5", "color": 1 },
+        { "coord": "D5", "color": 2 },
+        { "coord": "C6", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "E6",
+          "reply": null,
+          "feedback": "Solid! E6 connects D6 and E5 into a unified chain and threatens to counter-attack White's D5 stone."
+        }
+      ],
+      "wrongHints": {
+        "default": "White is threatening to push into E6 and split D6 from E5—occupy E6 first to stay connected!"
+      }
+    },
+    {
+      "id": "shape-06",
+      "title": "Wedge Through a Loose Jump",
+      "rank": "21k",
+      "concept": "A one-space jump with enemy stones pressing directly behind it can be wedged right through the middle.",
+      "prompt": "White has a loose one-space jump at C5 and E5 while you hold C4-D4. Slice right through the middle!",
+      "turn": 1,
+      "stones": [
+        { "coord": "C5", "color": 2 },
+        { "coord": "E5", "color": 2 },
+        { "coord": "D4", "color": 1 },
+        { "coord": "C4", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "D5",
+          "reply": null,
+          "feedback": "Sharp wedge! D5 splits C5 and E5 right down the middle while standing solidly on your C4-D4 base."
+        }
+      ],
+      "wrongHints": {
+        "default": "Drive straight into the open space at D5 between C5 and E5!"
+      }
     }
   ]
 }

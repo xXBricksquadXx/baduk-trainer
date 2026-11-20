@@ -67,6 +67,137 @@
       "wrongHints": {
         "default": "The enemy's vital point is my vital point: play at H8 right in the center of White's 3-point eye space."
       }
+    },
+    {
+      "id": "life-03",
+      "title": "Fix the False Eye!",
+      "rank": "21k",
+      "concept": "A False Eye has an enemy stone controlling its diagonal corner—meaning the enemy can put your wall in Atari and force you to fill your own eye.",
+      "prompt": "Black has one real eye at A1, but B3 is a FALSE eye because White threatens C4! Connect at C4 to turn B3 into a real second eye!",
+      "turn": 1,
+      "stones": [
+        { "coord": "A2", "color": 1 },
+        { "coord": "B1", "color": 1 },
+        { "coord": "B2", "color": 1 },
+        { "coord": "A4", "color": 1 },
+        { "coord": "B4", "color": 1 },
+        { "coord": "C3", "color": 1 },
+        { "coord": "C2", "color": 1 },
+        { "coord": "C1", "color": 1 },
+        { "coord": "A5", "color": 2 },
+        { "coord": "B5", "color": 2 },
+        { "coord": "C5", "color": 2 },
+        { "coord": "D4", "color": 2 },
+        { "coord": "D3", "color": 2 },
+        { "coord": "D2", "color": 2 },
+        { "coord": "D1", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "C4",
+          "reply": null,
+          "feedback": "Saved! Connecting at C4 unifies your A4-B4 stones with C3-C2-C1, turning B3 into a genuine second eye!"
+        }
+      ],
+      "wrongHints": {
+        "default": "Look at the diagonal gap between B4 and C3—if White plays C4, your A4-B4 stones go into Atari and B3 collapses! Connect at C4."
+      }
+    },
+    {
+      "id": "life-04",
+      "title": "Pyramid Four (Nakade Vital Point)",
+      "rank": "20k",
+      "concept": "A T-shaped 4-space pocket only lives if the defender holds the center intersection—if the attacker takes that center point first, the group dies.",
+      "prompt": "White's corner group has a T-shaped 4-space pocket (H9, G8, H8, J8). Strike the single vital point in the center of the T!",
+      "turn": 1,
+      "stones": [
+        { "coord": "G9", "color": 2 },
+        { "coord": "J9", "color": 2 },
+        { "coord": "F8", "color": 2 },
+        { "coord": "G7", "color": 2 },
+        { "coord": "H7", "color": 2 },
+        { "coord": "J7", "color": 2 },
+        { "coord": "F9", "color": 1 },
+        { "coord": "E8", "color": 1 },
+        { "coord": "F7", "color": 1 },
+        { "coord": "G6", "color": 1 },
+        { "coord": "H6", "color": 1 },
+        { "coord": "J6", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "H8",
+          "reply": null,
+          "feedback": "Bullseye! H8 is the heart of the T-shape—White is left with three disconnected corners and cannot form two eyes."
+        }
+      ],
+      "wrongHints": {
+        "default": "Find the intersection touching all three branches of White's T-pocket (H9, G8, and J8)—strike H8!"
+      }
+    },
+    {
+      "id": "life-05",
+      "title": "Expand Eye Space Before Closing",
+      "rank": "20k",
+      "concept": "A 2-space pocket in the corner is dead unless you expand it to 3 spaces along the edge first.",
+      "prompt": "Black's corner group is surrounded by White on the outside, with open edge space at D1. Expand your eye space to survive!",
+      "turn": 1,
+      "stones": [
+        { "coord": "A2", "color": 1 },
+        { "coord": "B2", "color": 1 },
+        { "coord": "C2", "color": 1 },
+        { "coord": "D2", "color": 1 },
+        { "coord": "A3", "color": 2 },
+        { "coord": "B3", "color": 2 },
+        { "coord": "C3", "color": 2 },
+        { "coord": "D3", "color": 2 },
+        { "coord": "E2", "color": 2 },
+        { "coord": "E1", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "D1",
+          "reply": null,
+          "feedback": "Alive! Descending to D1 creates a 3-space pocket (A1, B1, C1) so White can never stop you from playing B1 for two eyes!"
+        }
+      ],
+      "wrongHints": {
+        "default": "If White plays D1 first, your inner pocket shrinks to 2 spaces (A1-B1) which is only 1 eye! Descend to D1 immediately."
+      }
+    },
+    {
+      "id": "life-06",
+      "title": "2-Step Corner Kill",
+      "rank": "19k",
+      "concept": "Reduce the enemy's eye space from the outside first, then finish the capture on the edge.",
+      "prompt": "White's bottom-right corner isn't completely sealed yet. Shrink White's eye space from the outside first!",
+      "turn": 1,
+      "stones": [
+        { "coord": "G1", "color": 2 },
+        { "coord": "G2", "color": 2 },
+        { "coord": "H2", "color": 2 },
+        { "coord": "J3", "color": 2 },
+        { "coord": "F1", "color": 1 },
+        { "coord": "F2", "color": 1 },
+        { "coord": "G3", "color": 1 },
+        { "coord": "H3", "color": 1 },
+        { "coord": "J4", "color": 1 }
+      ],
+      "steps": [
+        {
+          "move": "J2",
+          "reply": "H1",
+          "feedback": "Step 1 complete! Pushing at J2 removes White's outer eye—White blocks at H1. Now deliver the lethal blow!"
+        },
+        {
+          "move": "J1",
+          "reply": null,
+          "feedback": "Step 2 complete! J1 puts the entire corner group in Atari with only 1 eye—White is captured!"
+        }
+      ],
+      "wrongHints": {
+        "default": "Throw in on the right edge at J2 first to shrink White's pocket, then finish at J1."
+      }
     }
   ]
 }

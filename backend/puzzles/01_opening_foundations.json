@@ -106,6 +106,86 @@
       "wrongHints": {
         "default": "1st and 2nd line moves only secure 1 point per stone. Extend two spaces along the 3rd line (F3 or C6) or take the center (E5)."
       }
+    },
+    {
+      "id": "open-04",
+      "title": "3rd Line vs. 1st Line Efficiency",
+      "rank": "29k",
+      "concept": "The 1st line surrounds zero points underneath; the 3rd line secures ~2 points per intersection along the edge.",
+      "prompt": "You hold C7 and White holds G3. Extend along the top 3rd line to wall off real corner-to-side territory.",
+      "turn": 1,
+      "stones": [
+        { "coord": "C7", "color": 1 },
+        { "coord": "G3", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "F7",
+          "reply": null,
+          "feedback": "Efficient! F7 sits on the 3rd line from the top edge, securing rows 8 and 9 underneath your wall."
+        },
+        {
+          "move": "E7",
+          "reply": null,
+          "feedback": "Solid 3rd-line extension! E7 walls off the upper-left territory cleanly."
+        }
+      ],
+      "wrongHints": {
+        "F9": "F9 is on the 1st line—it surrounds zero points underneath! Step down two rows onto the 3rd line (F7 or E7).",
+        "F8": "F8 is too low on the 2nd line; step out to the 3rd line (F7) for much larger territory.",
+        "default": "Extend along the top 3rd line (E7 or F7) to wall off the upper edge efficiently."
+      }
+    },
+    {
+      "id": "open-05",
+      "title": "Claim the Final Open Corner",
+      "rank": "28k",
+      "concept": "When three corners are occupied, claim the final open 3-3 corner before the opponent sweeps two adjacent quadrants.",
+      "prompt": "Move 4: Black holds C3 while White holds G7 and C7. Claim the final open 3-3 corner!",
+      "turn": 1,
+      "stones": [
+        { "coord": "C3", "color": 1 },
+        { "coord": "G7", "color": 2 },
+        { "coord": "C7", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "G3",
+          "reply": null,
+          "feedback": "Textbook! G3 secures the last open corner and links across the bottom with your C3 stone."
+        }
+      ],
+      "wrongHints": {
+        "default": "The bottom-right quadrant is completely open—claim the 3-3 point at G3!"
+      }
+    },
+    {
+      "id": "open-06",
+      "title": "Knight's Move Corner Enclosure",
+      "rank": "28k",
+      "concept": "A Knight's Move (1 step over, 2 steps along) wraps around a corner stone without leaving an easy cut.",
+      "prompt": "You own C3 and G3 while White owns E7. Lock down your bottom-left corner with a Knight's Move enclosure!",
+      "turn": 1,
+      "stones": [
+        { "coord": "C3", "color": 1 },
+        { "coord": "G3", "color": 1 },
+        { "coord": "E7", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "B5",
+          "reply": null,
+          "feedback": "Clean Knight's Move! B5 seals the left edge of your C3 corner while radiating influence up the side."
+        },
+        {
+          "move": "D5",
+          "reply": null,
+          "feedback": "Strong shape! D5 locks down the C3 corner and projects toward the center."
+        }
+      ],
+      "wrongHints": {
+        "default": "Wrap around C3 using a Knight's Move—play B5 on the left side or D5 toward the center."
+      }
     }
   ]
 }

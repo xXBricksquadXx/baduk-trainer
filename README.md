@@ -16,14 +16,21 @@ An interactive 9x9 Go (Baduk) trainer pairing a calibrated 30 Kyu – 1 Dan engi
 
 ## Why AI Sensei 9x9?
 
+> **TL;DR:** A local-first 9x9 Go dojo built to take a pure beginner from **30 Kyu → 1 Dan** through visual board overlays (`Territory + Early-Game Influence` & `Chain Liberties`), toggleable **3B Fast / 7B Deep** local Ollama coaching, SGF game review, and a 7-module High School-to-College puzzle curriculum backed by an honest SQLite skill rubric.
+
 Most Go apps treat **20 Kyu** as "beginner" and drop 30-Kyu newcomers straight into cryptic life-and-death puzzles without explaining _how to build from an empty board_ or _why_ a move works. **AI Sensei 9x9** bridges that gap through visual feedback, immediate tactical explanations, and weighted progression metrics:
 
 - **Calibrated AI Opponent (`30 Kyu` → `1 Dan`):** Scales candidate pool breadth, tactical reading depth, and Monte Carlo rollouts so novice ranks play genuine exploratory shapes while Dan ranks punish overplays.
-- **Interactive Rank 1–4 Hint Silhouettes:** Project the engine's top 4 candidate moves directly onto the SVG Goban. Click any numbered silhouette to inspect its purpose via local Ollama (`qwen2.5-coder:7b` with automatic `qwen2.5-coder:3b` fallback), and click a selected silhouette again to place the stone.
+- **Interactive Rank 1–4 Hint Silhouettes & `3B Fast` / `7B Deep` Toggle:** Project the engine's top 4 candidate moves directly onto the SVG Goban. Switch on the fly between **`3B Fast`** (`qwen2.5-coder:3b`, ~2s tactical reads for rapid puzzle reps on CPU/RAM) and **`7B Deep`** (`qwen2.5-coder:7b`, deeper post-game analysis), and click any selected silhouette again to place the stone.
 - **Spatial-Grounded Sensei Explanations:** Serializes exact stone inventories, orthogonal neighbor states, and Atari chain scans before prompting the local LLM—eliminating coordinate hallucinations.
-- **Live Area Advantage Stream:** Real-time header evaluation pill (`Black +10.5` / `White +2.5`) showing who is ahead after every move, undo, or redo.
-- **High School → College Puzzle Dojo:** Auto-discovering JSON curriculum packs covering empty-board openings, multi-stone chain liberties, post-move-5 midgame awareness, cuts/connections, and two-eye life/death—including multi-step interactive drills with automatic opponent replies.
-- **SQLite Teacher's Rubric (`backend/data/metrics.db`):** Tracks continuous floating-point Kyu/Dan rating weighted separately for live matches (Exam weight, with loss degradation) and puzzle drills (Lab weight & first-try accuracy).
+- **Visual Goban Overlays & Board-Footer Advantage Bar:** Toggle **`Territory: ON`** (displaying both 100% sealed territory squares and early-game Manhattan influence dots before walls close) and **`Liberties: ON`** (live liberty badges on every connected stone chain with crimson Atari alerts), paired with a live `#349259` emerald **Area Advantage Bar** right beneath the board.
+- **High School → College Puzzle Dojo (7 Modules, 42+ Drills):** Auto-discovering JSON curriculum packs covering empty-board openings, multi-stone chain liberties, post-move-5 midgame awareness, cuts/connections, two-eye life/death, ladders/nets, and endgame _Yose_—complete with pre-drill **Sensei Principle** callouts and multi-step interactive opponent replies.
+- **SGF Export/Import & SQLite Teacher's Rubric (`backend/data/metrics.db`):** Export matches to standard `.sgf` files or import games for Sensei review, while SQLite tracks continuous floating-point Kyu/Dan rating weighted separately for live matches (Exam weight, with loss degradation) and puzzle drills (Lab weight & first-try accuracy).
+
+### Roadmap
+
+- **Curriculum Expansion:** Continual addition of High School & College JSON drills (false-eye traps, snapbacks, and endgame _sente/gote_ sequences).
+- **KataGo / GNU Go Engine Hook:** Drop-in neural policy/value integration via `backend/engine_bridge.py` for high-Kyu and Dan-level sparring once foundational 30k–15k mastery is locked in.
 
 ---
 

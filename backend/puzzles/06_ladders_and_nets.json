@@ -86,6 +86,102 @@
       "wrongHints": {
         "default": "Look at the empty corner point A9—occupying it reduces White's entire 3-stone corner group to 1 liberty."
       }
+    },
+    {
+      "id": "college-04",
+      "title": "2-Step Throw-In Liberty Squeeze",
+      "rank": "18k",
+      "concept": "Throwing a sacrifice stone inside an enemy eye forces them to capture and fill their own outside liberty.",
+      "prompt": "White's 3 stones at H1, J1, J2 have 2 liberties (G1 and H2). Reduce their liberties with a Throw-In!",
+      "turn": 1,
+      "stones": [
+        { "coord": "H1", "color": 2 },
+        { "coord": "J1", "color": 2 },
+        { "coord": "J2", "color": 2 },
+        { "coord": "G2", "color": 1 },
+        { "coord": "H3", "color": 1 },
+        { "coord": "J3", "color": 1 },
+        { "coord": "F1", "color": 1 }
+      ],
+      "steps": [
+        {
+          "move": "G1",
+          "reply": "H2",
+          "feedback": "Step 1 complete! G1 puts White in Atari—White connects at H2 to stay alive for one more move. Now plug the last liberty!"
+        },
+        {
+          "move": "G1",
+          "reply": null,
+          "feedback": "Wait—G1 is already your stone! Look at White's remaining liberties after H2: G1 and H3/J3 are Black, so White only has 1 liberty left—wait: G1 is occupied, so check H2's neighbors!"
+        }
+      ],
+      "solutions": [
+        {
+          "move": "H2",
+          "reply": null,
+          "feedback": "Sharp wedge! H2 cuts White's J2 stone off from H1-J1 and puts J2 in immediate Atari against the edge!"
+        }
+      ],
+      "wrongHints": {
+        "default": "Play H2 to split White's J2 stone from H1-J1—J2 drops straight to 1 liberty!"
+      }
+    },
+    {
+      "id": "college-05",
+      "title": "Read the Ladder Breaker!",
+      "rank": "17k",
+      "concept": "Before starting a diagonal ladder, look ahead along its path—if an enemy stone sits in the ladder's path, the ladder will fail and you must use a Net instead.",
+      "prompt": "White's stone at D4 has 2 liberties (E4 and D5), and White already has a stone waiting at G7 along the diagonal! Don't play a broken ladder—cast a Net!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D4", "color": 2 },
+        { "coord": "G7", "color": 2 },
+        { "coord": "C4", "color": 1 },
+        { "coord": "D3", "color": 1 },
+        { "coord": "F4", "color": 1 },
+        { "coord": "D6", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "E5",
+          "reply": null,
+          "feedback": "Great reading! Because White's G7 stone breaks the ladder, stepping to E5 casts a loose Net that traps D4 cleanly!"
+        }
+      ],
+      "wrongHints": {
+        "E4": "If you Atari at E4, White runs diagonally (D5-E5-E6-F6) right into their G7 ally and breaks your whole position!",
+        "D5": "If you Atari at D5, White runs into G7 and escapes! Use a loose Net at E5 instead.",
+        "default": "White's G7 stone breaks the diagonal ladder—play E5 to trap D4 in a loose Net."
+      }
+    },
+    {
+      "id": "college-06",
+      "title": "Edge Pin (Get-a-Base Trap)",
+      "rank": "16k",
+      "concept": "A stone on the 2nd line flanked on both sides cannot jump over a 3rd-line cap—it has nowhere to make two eyes.",
+      "prompt": "White's stone at E2 is trying to live on the bottom edge between your C2 and G2 stones. Cap it from above!",
+      "turn": 1,
+      "stones": [
+        { "coord": "E2", "color": 2 },
+        { "coord": "C2", "color": 1 },
+        { "coord": "G2", "color": 1 },
+        { "coord": "D3", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "F3",
+          "reply": null,
+          "feedback": "Clean net! F3 teams up with D3, C2, and G2 to seal White's E2 stone completely along the 1st/2nd line."
+        },
+        {
+          "move": "E3",
+          "reply": null,
+          "feedback": "Strong press! E3 pins White's E2 stone flat onto the 1st line with minimal eye space."
+        }
+      ],
+      "wrongHints": {
+        "default": "Keep White pinned to the bottom edge—play F3 or E3 to close off its escape into the center."
+      }
     }
   ]
 }

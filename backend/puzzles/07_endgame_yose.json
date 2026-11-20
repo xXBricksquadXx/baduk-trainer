@@ -78,6 +78,137 @@
       "wrongHints": {
         "default": "Look at the gap between E6 and D4—White is ready to wedge into E5/D5 and shatter your wall."
       }
+    },
+    {
+      "id": "yose-03",
+      "title": "Should You Pass? Left-Edge Leak!",
+      "rank": "16k",
+      "concept": "SGF Lesson: Passing while an enemy stone sits on the 2nd line (B5) with an open 1st-line slide (A6) lets the opponent steal your entire upper-left edge for free.",
+      "prompt": "You own the upper-left territory (B6, C6, C7, C8, C9) while White holds B4 and B5. Don't pass yet—seal the left edge!",
+      "turn": 1,
+      "stones": [
+        { "coord": "B6", "color": 1 },
+        { "coord": "C6", "color": 1 },
+        { "coord": "C7", "color": 1 },
+        { "coord": "C8", "color": 1 },
+        { "coord": "C9", "color": 1 },
+        { "coord": "B4", "color": 2 },
+        { "coord": "B5", "color": 2 },
+        { "coord": "C4", "color": 2 },
+        { "coord": "C5", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "A6",
+          "reply": null,
+          "feedback": "Sealed! A6 stops White's B5 stone from sliding up A6-A7-A8-A9 into your upper-left corner!"
+        },
+        {
+          "move": "A5",
+          "reply": null,
+          "feedback": "Aggressive endgame Hane! A5 blocks White's slide AND threatens to capture White's B5 stone!"
+        }
+      ],
+      "wrongHints": {
+        "default": "Check the A-file on the far left edge! White's B5 stone is poised to slide straight up A6-A7-A8 if you don't block at A6 or A5."
+      }
+    },
+    {
+      "id": "yose-04",
+      "title": "Should You Pass? Top-Edge Leak!",
+      "rank": "15k",
+      "concept": "SGF Lesson: When your wall stops on the 2nd line (D8) next to an enemy stone (C8), the 1st-line point (D9/C9) is worth 2–4 points in Sente.",
+      "prompt": "Black owns the top-right (D8, D7, E7, F7) and White owns the top-left (C8, C7). Close the 1st-line border on the top edge!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D8", "color": 1 },
+        { "coord": "D7", "color": 1 },
+        { "coord": "E7", "color": 1 },
+        { "coord": "F7", "color": 1 },
+        { "coord": "C8", "color": 2 },
+        { "coord": "C7", "color": 2 },
+        { "coord": "B8", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "D9",
+          "reply": null,
+          "feedback": "Clean seal! D9 locks down the top edge so White cannot play D9 and E9 into your upper-right corner."
+        },
+        {
+          "move": "C9",
+          "reply": null,
+          "feedback": "Sharp Sente Hane! C9 steals an extra point on the 1st line and forces White to defend B9."
+        }
+      ],
+      "wrongHints": {
+        "default": "Look at row 9 along the top edge—D8 and C8 leave the 1st-line gate (D9 / C9) wide open!"
+      }
+    },
+    {
+      "id": "yose-05",
+      "title": "Double-Sente Endgame Push",
+      "rank": "13k",
+      "concept": "A Double-Sente move gains points for you AND prevents the opponent from gaining points—always play it before neutral 1-point Dame.",
+      "prompt": "Both players have walls facing the bottom-right corner (Black at F3-F2, White at G4-H4). Step into the open corner boundary!",
+      "turn": 1,
+      "stones": [
+        { "coord": "F4", "color": 1 },
+        { "coord": "F3", "color": 1 },
+        { "coord": "F2", "color": 1 },
+        { "coord": "G4", "color": 2 },
+        { "coord": "H4", "color": 2 },
+        { "coord": "J4", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "F1",
+          "reply": null,
+          "feedback": "Solid! F1 seals your bottom-left territory completely against White's G4-H4 wall."
+        },
+        {
+          "move": "G2",
+          "reply": null,
+          "feedback": "Strong endgame reduction! G2 steps into White's corner base while keeping your F2-F3 stones connected."
+        }
+      ],
+      "wrongHints": {
+        "default": "Play F1 to seal the 1st-line gate or G2 to reduce White's bottom-right corner."
+      }
+    },
+    {
+      "id": "yose-06",
+      "title": "2-Step Endgame Hane & Connect",
+      "rank": "12k",
+      "concept": "Endgame Hane-and-Connect is the classic 2-move sequence that squeezes 2 extra points out of every straight wall.",
+      "prompt": "Black's wall (E5-E4-E3) faces White's wall (F5-F4-F3). Play the 2nd-line Hane at F2 to squeeze White's corner!",
+      "turn": 1,
+      "stones": [
+        { "coord": "E6", "color": 1 },
+        { "coord": "E5", "color": 1 },
+        { "coord": "E4", "color": 1 },
+        { "coord": "E3", "color": 1 },
+        { "coord": "F6", "color": 2 },
+        { "coord": "F5", "color": 2 },
+        { "coord": "F4", "color": 2 },
+        { "coord": "F3", "color": 2 },
+        { "coord": "G2", "color": 2 }
+      ],
+      "steps": [
+        {
+          "move": "F2",
+          "reply": "F1",
+          "feedback": "Step 1 complete! F2 forces White to block at F1, leaving a cutting point at E2. Now connect solidly!"
+        },
+        {
+          "move": "E2",
+          "reply": null,
+          "feedback": "Step 2 complete! Connecting at E2 locks in 2 extra points along the bottom edge with a watertight border."
+        }
+      ],
+      "wrongHints": {
+        "default": "Push around the end of White's wall at F2 first, then connect back at E2 after White blocks at F1."
+      }
     }
   ]
 }
