@@ -51,6 +51,7 @@ class ExplainRequest(BaseModel):
     koPoint: Optional[List[int]] = None
     mode: str = "hint"
     rank: str = "25k"
+    model: str = "qwen2.5-coder:3b"
 
 
 @app.get("/api/health")
@@ -152,6 +153,7 @@ async def explain_move(req: ExplainRequest):
         top_candidates=candidates,
         mode=req.mode,
         user_rank=req.rank,
+        model=req.model,
     )
     return result
 

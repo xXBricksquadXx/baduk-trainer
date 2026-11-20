@@ -79,6 +79,7 @@ export default function App() {
   const [selectedHint, setSelectedHint] = useState(null);
   const [senseiLoading, setSenseiLoading] = useState(false);
   const [explanationData, setExplanationData] = useState(null);
+  const [senseiModel, setSenseiModel] = useState('qwen2.5-coder:3b');
 
   // Milestone 4 & 5: Puzzle Dojo & SQLite Progress Telemetry
   const [activeTab, setActiveTab] = useState('match'); // 'match' | 'dojo' | 'progress'
@@ -617,6 +618,7 @@ export default function App() {
           koPoint: activeKo ? [activeKo.row, activeKo.col] : null,
           mode,
           rank: aiRank,
+          model: senseiModel,
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -833,40 +835,57 @@ export default function App() {
   };
 
   const renderOverlayStrip = () => (
-    <div className="overlay-strip">
-      <button
-        className={showTerritory ? 'active' : ''}
-        onClick={() => setShowTerritory((v) => !v)}
-        title="Highlight surrounded Black and White territory regions"
-      >
-        Territory: {showTerritory ? 'ON' : 'OFF'}
-      </button>
-      <button
-        className={showLiberties ? 'active' : ''}
-        onClick={() => setShowLiberties((v) => !v)}
-        title="Show remaining liberties on every connected stone chain"
-      >
-        Liberties: {showLiberties ? 'ON' : 'OFF'}
-      </button>
-      {activeTab === 'match' ? (
+    <>
+      <div className="overlay-strip">
         <button
-          onClick={handleExportSgf}
-          disabled={moveHistory.length === 0}
-          title="Download current game as a standard .sgf file"
+          className={showTerritory ? 'active' : ''}
+          onClick={() => setShowTerritory((v) => !v)}
+          title="Highlight surrounded Black and White territory regions"
         >
-          Export SGF
+          Territory: {showTerritory ? 'ON' : 'OFF'}
         </button>
-      ) : (
         <button
-          onClick={() => {
-            setShowTerritory(false);
-            setShowLiberties(false);
-          }}
+          className={showLiberties ? 'active' : ''}
+          onClick={() => setShowLiberties((v) => !v)}
+          title="Show remaining liberties on every connected stone chain"
         >
-          Clear Overlays
+          Liberties: {showLiberties ? 'ON' : 'OFF'}
         </button>
+        {activeTab === 'match' ? (
+          <button
+            onClick={handleExportSgf}
+            disabled={moveHistory.length === 0}
+            title="Download current game as a standard .sgf file"
+          >
+            Export SGF
+          </button>
+        ) : (
+          <button
+            onClick={() => {
+              setShowTerritory(false);
+              setShowLiberties(false);
+            }}
+          >
+            Clear Overlays
+          </button>
+        )}
+      </div>
+
+      {activeTab === 'match' && liveAdvantage && (
+        <div
+          className="board-advantage-bar"
+          title="Live Area Territory Lead (Includes Komi)"
+        >
+          <span className="adv-label">Live Area Advantage</span>
+          <span className="adv-value">
+            {liveAdvantage.winner} +{liveAdvantage.margin} pts
+          </span>
+          <span className="adv-split">
+            (B: {liveAdvantage.black} | W: {liveAdvantage.white})
+          </span>
+        </div>
       )}
-    </div>
+    </>
   );
 
   return (
@@ -875,14 +894,6 @@ export default function App() {
         <div className="brand">
           <img src="/logo.jpg" alt="AI Sensei 9x9" className="brand-logo" />
           <h1>AI Sensei 9x9</h1>
-          {liveAdvantage && (
-            <span
-              className="advantage-pill"
-              title="Live Area Territory Lead (Includes Komi)"
-            >
-              {liveAdvantage.winner} +{liveAdvantage.margin}
-            </span>
-          )}
           <span className="badge">{engineStatus}</span>
           <span className="badge">Rank: {progressStats.estimatedRank}</span>
         </div>
@@ -1149,9 +1160,26 @@ export default function App() {
               <div className="panel-card sensei-card">
                 <div className="sensei-header">
                   <h2>Sensei Coaching</h2>
-                  {explanationData?.model && (
-                    <span className="model-tag">{explanationData.model}</span>
-                  )}
+                  <div className="model-toggle-group">
+                    <button
+                      type="button"
+                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:3b' ? 'active' : ''}`}
+                      onClick={() => setSenseiModel('qwen2.5-coder:3b')}
+                      disabled={senseiLoading}
+                      title="Fast ~2s tactical reads via qwen2.5-coder:3b"
+                    >
+                      3B Fast
+                    </button>
+                    <button
+                      type="button"
+                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:7b' ? 'active' : ''}`}
+                      onClick={() => setSenseiModel('qwen2.5-coder:7b')}
+                      disabled={senseiLoading}
+                      title="Deeper analysis via qwen2.5-coder:7b"
+                    >
+                      7B Deep
+                    </button>
+                  </div>
                 </div>
 
                 <div className="sym-grid-2">
@@ -1355,9 +1383,26 @@ export default function App() {
               <div className="panel-card sensei-card">
                 <div className="sensei-header">
                   <h2>Sensei Coaching</h2>
-                  {explanationData?.model && (
-                    <span className="model-tag">{explanationData.model}</span>
-                  )}
+                  <div className="model-toggle-group">
+                    <button
+                      type="button"
+                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:3b' ? 'active' : ''}`}
+                      onClick={() => setSenseiModel('qwen2.5-coder:3b')}
+                      disabled={senseiLoading}
+                      title="Fast ~2s tactical reads via qwen2.5-coder:3b"
+                    >
+                      3B Fast
+                    </button>
+                    <button
+                      type="button"
+                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:7b' ? 'active' : ''}`}
+                      onClick={() => setSenseiModel('qwen2.5-coder:7b')}
+                      disabled={senseiLoading}
+                      title="Deeper analysis via qwen2.5-coder:7b"
+                    >
+                      7B Deep
+                    </button>
+                  </div>
                 </div>
 
                 <div className="sym-grid-2">

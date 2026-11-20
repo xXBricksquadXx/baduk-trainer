@@ -83,18 +83,6 @@ body {
   white-space: nowrap;
 }
 
-.advantage-pill {
-  font-size: 0.74rem;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: rgba(52, 146, 89, 0.18);
-  border: 1px solid var(--emerald);
-  color: #86efac;
-  white-space: nowrap;
-  box-shadow: 0 0 10px rgba(52, 146, 89, 0.22);
-}
-
 .top-nav {
   display: flex;
   align-items: center;
@@ -136,7 +124,7 @@ body {
 }
 
 /* ==========================================================================
-   3. WORKSPACE LAYOUT, STICKY GOBAN & OVERLAY STRIP
+   3. WORKSPACE LAYOUT, STICKY GOBAN, OVERLAY STRIP & ADVANTAGE BAR
    ========================================================================== */
 .workspace {
   flex: 1;
@@ -179,6 +167,39 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
+}
+
+.board-advantage-bar {
+  width: 100%;
+  max-width: 560px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 6px;
+  background: rgba(52, 146, 89, 0.16);
+  border: 1px solid var(--emerald);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  box-shadow: 0 0 10px rgba(52, 146, 89, 0.18);
+}
+
+.board-advantage-bar .adv-label {
+  color: var(--muted);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.board-advantage-bar .adv-value {
+  color: #86efac;
+  font-weight: 700;
+}
+
+.board-advantage-bar .adv-split {
+  color: #cbd5e1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.74rem;
 }
 
 .control-pane {
@@ -398,7 +419,7 @@ button.active {
 }
 
 /* ==========================================================================
-   7. SENSEI COACHING, PUZZLE DOJO & PROGRESS DASHBOARD
+   7. SENSEI COACHING, MODEL TOGGLE, PUZZLE DOJO & PROGRESS DASHBOARD
    ========================================================================== */
 .sensei-header {
   display: flex;
@@ -423,6 +444,20 @@ button.active {
   color: #38bdf8;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.model-toggle-group {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.mini-toggle {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 0.68rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  border-radius: 4px;
 }
 
 .sensei-output {
