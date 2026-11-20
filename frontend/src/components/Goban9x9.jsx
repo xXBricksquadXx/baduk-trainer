@@ -178,26 +178,55 @@ export default function Goban9x9({
           );
         })}
 
-        {/* Toggleable Territory Ownership Overlay */}
+        {/* Toggleable Territory & Early-Game Influence Overlay */}
         {territoryMap &&
           territoryMap.map((rowArr, r) =>
             rowArr.map((owner, c) => {
               if (owner === 0 || board[r][c] !== EMPTY) return null;
               const { x, y } = getXY(r, c);
-              const isB = owner === BLACK;
+
+              // Sealed territory (1 = Black, 2 = White)
+              if (owner === BLACK || owner === WHITE) {
+                const isB = owner === BLACK;
+                return (
+                  <rect
+                    key={`terr-${r}-${c}`}
+                    x={x - 11}
+                    y={y - 11}
+                    width="22"
+                    height="22"
+                    rx="4"
+                    fill={
+                      isB
+                        ? 'rgba(15, 17, 21, 0.72)'
+                        : 'rgba(255, 255, 255, 0.85)'
+                    }
+                    stroke={isB ? '#eab308' : '#334155'}
+                    strokeWidth="1.5"
+                    pointerEvents="none"
+                  />
+                );
+              }
+
+              // Early/midgame sphere of influence (-1 = Black, -2 = White)
+              const isBInf = owner === -BLACK;
               return (
-                <rect
-                  key={`terr-${r}-${c}`}
-                  x={x - 11}
-                  y={y - 11}
-                  width="22"
-                  height="22"
-                  rx="4"
+                <circle
+                  key={`inf-${r}-${c}`}
+                  cx={x}
+                  cy={y}
+                  r="6.5"
                   fill={
-                    isB ? 'rgba(15, 17, 21, 0.68)' : 'rgba(255, 255, 255, 0.82)'
+                    isBInf
+                      ? 'rgba(15, 17, 21, 0.42)'
+                      : 'rgba(255, 255, 255, 0.56)'
                   }
-                  stroke={isB ? '#eab308' : '#334155'}
-                  strokeWidth="1.4"
+                  stroke={
+                    isBInf
+                      ? 'rgba(234, 179, 8, 0.65)'
+                      : 'rgba(71, 85, 105, 0.65)'
+                  }
+                  strokeWidth="1.1"
                   pointerEvents="none"
                 />
               );

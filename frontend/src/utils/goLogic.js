@@ -194,8 +194,12 @@ export function estimateAreaScore(board, komi = 6.5) {
 }
 
 /**
- * Maps every empty intersection to BLACK (1), WHITE (2), or 0 (neutral/contested)
- * so the Goban can render a toggleable territory overlay.
+ * Maps every empty intersection to:
+ *   1  = Sealed Black Territory
+ *   2  = Sealed White Territory
+ *  -1  = Unsealed Black Sphere of Influence (early/midgame radiation)
+ *  -2  = Unsealed White Sphere of Influence (early/midgame radiation)
+ *   0  = Contested / Neutral
  */
 export function computeTerritoryMap(board) {
   const territory = Array.from({ length: BOARD_SIZE }, () =>
@@ -205,6 +209,7 @@ export function computeTerritoryMap(board) {
     Array(BOARD_SIZE).fill(false),
   );
 
+  // 1. Pass 1: Identify 100% sealed territory regions
   for (let r = 0; r < BOARD_SIZE; r++) {
     for (let c = 0; c < BOARD_SIZE; c++) {
       if (board[r][c] === EMPTY && !visited[r][c]) {
@@ -237,6 +242,45 @@ export function computeTerritoryMap(board) {
       }
     }
   }
+
+  // 2. Pass 2: Early/Midgame Manhattan Influence Field on unsealed intersections
+  const hasAnyStones = board.some((row) => row.some((cell) => cell !== EMPTY));
+  if (!hasAnyStones) return territory;
+
+  const influence = Array.from({ length: BOARD_SIZE }, () =>
+    Array(BOARD_SIZE).fill(0),
+  );
+
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      const stone = board[r][c];
+      if (stone === EMPTY) continue;
+      const sign = stone === BLACK ? 1 : -1;
+
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          const dist = Math.abs(dr) + Math.abs(dc);
+          if (dist === 0 || dist > 2) continue;
+          const rr = r + dr;
+          const cc = c + dc;
+          if (rr >= 0 && rr < BOARD_SIZE && cc >= 0 && cc < BOARD_SIZE) {
+            // Distance 1 radiates +2, distance 2 radiates +1
+            influence[rr][cc] += sign * (dist === 1 ? 2 : 1);
+          }
+        }
+      }
+    }
+  }
+
+  for (let r = 0; r < BOARD_SIZE; r++) {
+    for (let c = 0; c < BOARD_SIZE; c++) {
+      if (board[r][c] === EMPTY && territory[r][c] === 0) {
+        if (influence[r][c] >= 2) territory[r][c] = -BLACK;
+        else if (influence[r][c] <= -2) territory[r][c] = -WHITE;
+      }
+    }
+  }
+
   return territory;
 }
 
