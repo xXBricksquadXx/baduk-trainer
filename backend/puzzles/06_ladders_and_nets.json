@@ -103,18 +103,6 @@
         { "coord": "J3", "color": 1 },
         { "coord": "F1", "color": 1 }
       ],
-      "steps": [
-        {
-          "move": "G1",
-          "reply": "H2",
-          "feedback": "Step 1 complete! G1 puts White in Atari—White connects at H2 to stay alive for one more move. Now plug the last liberty!"
-        },
-        {
-          "move": "G1",
-          "reply": null,
-          "feedback": "Wait—G1 is already your stone! Look at White's remaining liberties after H2: G1 and H3/J3 are Black, so White only has 1 liberty left—wait: G1 is occupied, so check H2's neighbors!"
-        }
-      ],
       "solutions": [
         {
           "move": "H2",
