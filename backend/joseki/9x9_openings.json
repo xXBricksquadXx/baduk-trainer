@@ -1,0 +1,167 @@
+{
+  "title": "9x9 Opening & Joseki Explorer",
+  "description": "Explore foundational 9x9 Fuseki (opening frameworks) and Joseki (settled corner exchanges) with standard Go terminology.",
+  "root": {
+    "id": "root",
+    "move": null,
+    "term": "Empty 9x9 Goban (Fuseki)",
+    "summary": "On a compact 9x9 board, the center (Tengen) and the 3-3 / 3-4 / 4-4 points collide within 4–5 moves. Click any numbered marker to explore its branch.",
+    "children": [
+      {
+        "move": "E5",
+        "term": "Tengen (Center Star Point)",
+        "summary": "The strongest single-stone opening on 9x9. Radiates influence equally into all four corners and prevents the opponent from building a central wall.",
+        "children": [
+          {
+            "move": "C3",
+            "term": "San-San (3-3 Corner Counter)",
+            "summary": "White concedes central influence to Black's E5 stone in exchange for immediate, un-invadable corner territory in the bottom-left.",
+            "children": [
+              {
+                "move": "G7",
+                "term": "Diagonal Corner Claim",
+                "summary": "Black claims the opposite 3-3 corner while already holding E5—forcing White to split or approach immediately.",
+                "children": [
+                  {
+                    "move": "C7",
+                    "term": "Adjacent Corner Enclosure",
+                    "summary": "White takes the upper-left corner to build a left-side wall (C3–C7) facing Black's E5–G7 axis."
+                  },
+                  {
+                    "move": "G3",
+                    "term": "Symmetric Corner Balance",
+                    "summary": "White takes the bottom-right corner, dividing the board diagonally (White: C3+G3, Black: E5+G7)."
+                  }
+                ]
+              },
+              {
+                "move": "D3",
+                "term": "Tsuke (Direct Attachment)",
+                "summary": "Aggressive contact play against White's 3-3 stone, using Black's E5 center stone as backup to start an immediate fight.",
+                "children": [
+                  {
+                    "move": "C4",
+                    "term": "Nobiru (Solid Extension)",
+                    "summary": "White stands up along the 3rd line to keep a base, inviting Black to press at D4."
+                  },
+                  {
+                    "move": "D4",
+                    "term": "Hane (Counter-Bend)",
+                    "summary": "White bends around the head of Black's D3 stone to contest the center—sharp tactical fighting!"
+                  }
+                ]
+              },
+              {
+                "move": "F3",
+                "term": "Ogeima / Approach",
+                "summary": "Black approaches White's C3 corner from a distance while linking harmoniously with E5."
+              }
+            ]
+          },
+          {
+            "move": "D4",
+            "term": "Hoshi (4-4 Influence Counter)",
+            "summary": "White plays on the 4th line to match Black's speed and influence rather than hunkering down on the 3-3 point.",
+            "children": [
+              {
+                "move": "F6",
+                "term": "Opposite 4-4 Wall",
+                "summary": "Black mirrors on the upper-right 4-4 point, turning E5–F6 into a sweeping central diagonal."
+              },
+              {
+                "move": "C3",
+                "term": "San-San Invasion Under 4-4",
+                "summary": "Black dives straight into the 3-3 point underneath White's D4 stone—stealing the corner while White builds an outer wall."
+              }
+            ]
+          },
+          {
+            "move": "D3",
+            "term": "Komoku (3-4 Corner)",
+            "summary": "Balances corner territory with directional facing toward the bottom side."
+          }
+        ]
+      },
+      {
+        "move": "C3",
+        "term": "San-San (3-3 Corner Opening)",
+        "summary": "Secures the bottom-left corner in one move. Because two board edges act as free walls, White cannot easily live inside this corner.",
+        "children": [
+          {
+            "move": "E5",
+            "term": "Tengen Response",
+            "summary": "White immediately claims the center of the board to stop Black from expanding out of C3.",
+            "children": [
+              {
+                "move": "G7",
+                "term": "Double 3-3 Corners",
+                "summary": "Black claims the opposite corner, challenging White to prove that central thickness beats two secure corners."
+              },
+              {
+                "move": "F3",
+                "term": "2-Space Side Extension (Hiraki)",
+                "summary": "Black extends along the bottom 3rd line to turn C3 into a broad side base."
+              }
+            ]
+          },
+          {
+            "move": "G7",
+            "term": "Opposite 3-3 Mirror",
+            "summary": "White claims the diagonally opposite corner, leading to a balanced territorial race.",
+            "children": [
+              {
+                "move": "E5",
+                "term": "Central Wedge (Tengen)",
+                "summary": "Black occupies the center point between both corners, controlling the flow of the midgame."
+              },
+              {
+                "move": "C7",
+                "term": "Three-Corner Opening",
+                "summary": "Black takes a third corner, daring White to invade the left side around C5."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "move": "D3",
+        "term": "Komoku (3-4 Corner Opening)",
+        "summary": "One step off the 3-3 point—faces the bottom edge while leaving a 3-3 corner spot open for a follow-up enclosure.",
+        "children": [
+          {
+            "move": "F6",
+            "term": "Opposite 4-4 (Hoshi)",
+            "summary": "White answers with speed and influence in the upper-right quadrant."
+          },
+          {
+            "move": "E5",
+            "term": "Tengen Counter",
+            "summary": "White takes the center to prevent Black from building a huge bottom-left moyo (framework)."
+          },
+          {
+            "move": "C5",
+            "term": "Kakari (Corner Approach)",
+            "summary": "White approaches Black's 3-4 stone immediately on the left side before Black can enclose the corner."
+          }
+        ]
+      },
+      {
+        "move": "D4",
+        "term": "Hoshi (4-4 Influence Opening)",
+        "summary": "Prioritizes outward speed and center influence over immediate corner territory. Leaves the 3-3 point (C3) open.",
+        "children": [
+          {
+            "move": "F6",
+            "term": "Cross-Board Hoshi",
+            "summary": "Symmetric 4-4 battle—both players prioritize central thickness and fast development."
+          },
+          {
+            "move": "C3",
+            "term": "Immediate San-San Dive",
+            "summary": "White dives directly into the 3-3 point beneath D4, trading outer thickness for solid corner cash."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -77,12 +77,13 @@ export default function App() {
   // Sensei Hints & Ollama Explanation State
   const [hints, setHints] = useState([]);
   const [selectedHint, setSelectedHint] = useState(null);
+  const [hintsLoading, setHintsLoading] = useState(false);
   const [senseiLoading, setSenseiLoading] = useState(false);
   const [explanationData, setExplanationData] = useState(null);
   const [senseiModel, setSenseiModel] = useState('qwen2.5-coder:3b');
 
-  // Milestone 4 & 5: Puzzle Dojo & SQLite Progress Telemetry
-  const [activeTab, setActiveTab] = useState('match'); // 'match' | 'dojo' | 'progress'
+  // Navigation & Curriculum State ('match' | 'dojo' | 'joseki' | 'progress')
+  const [activeTab, setActiveTab] = useState('match');
   const [puzzlePacks, setPuzzlePacks] = useState([]);
   const [activePackIdx, setActivePackIdx] = useState(0);
   const [activePuzzleIdx, setActivePuzzleIdx] = useState(0);
@@ -91,6 +92,11 @@ export default function App() {
   const [puzzleFeedback, setPuzzleFeedback] = useState(null);
   const [puzzleSolved, setPuzzleSolved] = useState(false);
   const [puzzleStepIndex, setPuzzleStepIndex] = useState(0);
+
+  // Milestone 8: 9x9 Opening & Joseki Explorer
+  const [josekiData, setJosekiData] = useState(null);
+  const [josekiPath, setJosekiPath] = useState([]);
+
   const [progressStats, setProgressStats] = useState({
     solvedIds: [],
     totalSolved: 0,
@@ -124,7 +130,60 @@ export default function App() {
       ? estimateAreaScore(board, activeHandicap.komi)
       : null;
 
-  const activeBoardForOverlay = activeTab === 'dojo' ? puzzleBoard : board;
+  // Compute current Joseki Explorer board & next candidate markers (1..N)
+  const josekiState = (() => {
+    let simBoard = createInitialBoard(0);
+    let simTurn = BLACK;
+    let lastPt = null;
+    for (const node of josekiPath) {
+      const parsed = fromCoordString(node.move);
+      if (parsed) {
+        const res = applyMove(simBoard, parsed.row, parsed.col, simTurn, null);
+        if (res.valid) {
+          simBoard = res.board;
+          lastPt = { row: parsed.row, col: parsed.col };
+          simTurn = simTurn === BLACK ? WHITE : BLACK;
+        }
+      }
+    }
+    const currentNode =
+      josekiPath.length > 0
+        ? josekiPath[josekiPath.length - 1]
+        : josekiData?.root || {
+            move: null,
+            term: 'Empty 9x9 Goban (Fuseki)',
+            summary: 'Select a starting point.',
+            children: [],
+          };
+    const nextMarkers = (currentNode.children || [])
+      .map((child, idx) => {
+        const parsed = fromCoordString(child.move);
+        if (!parsed) return null;
+        return {
+          rank: idx + 1,
+          move: child.move,
+          row: parsed.row,
+          col: parsed.col,
+          node: child,
+        };
+      })
+      .filter(Boolean);
+
+    return {
+      board: simBoard,
+      turn: simTurn,
+      lastMove: lastPt,
+      currentNode,
+      nextMarkers,
+    };
+  })();
+
+  const activeBoardForOverlay =
+    activeTab === 'dojo'
+      ? puzzleBoard
+      : activeTab === 'joseki'
+        ? josekiState.board
+        : board;
   const territoryOverlay = showTerritory
     ? computeTerritoryMap(activeBoardForOverlay)
     : null;
@@ -148,6 +207,11 @@ export default function App() {
           setPuzzleBoard(packs[0].puzzles[0].board);
         }
       })
+      .catch(() => {});
+
+    fetch(`${API_BASE}/joseki`)
+      .then((res) => res.json())
+      .then((data) => setJosekiData(data))
       .catch(() => {});
   }, []);
 
@@ -636,16 +700,16 @@ export default function App() {
   };
 
   const handleRequestHints = async () => {
-    if (senseiLoading) return;
+    if (hintsLoading) return;
     if (activeTab === 'match' && (gameResult || aiThinking)) return;
 
     const targetBoard = activeTab === 'dojo' ? puzzleBoard : board;
     const targetColor =
       activeTab === 'dojo' ? currentPuzzle?.turn || BLACK : currentTurn;
-    const targetKo = activeTab === 'dojo' ? null : koPoint;
+    const targetKo = activeTab === 'match' ? koPoint : null;
 
-    setSenseiLoading(true);
-    setStatusBanner('Sensei is analyzing top 4 candidate moves...');
+    setHintsLoading(true);
+    setStatusBanner('Computing top 4 candidate moves...');
     try {
       const res = await fetch(`${API_BASE}/hints`, {
         method: 'POST',
@@ -661,12 +725,15 @@ export default function App() {
       const data = await res.json();
       const topHints = data.hints || [];
       setHints(topHints);
+      setHintsLoading(false);
+
       if (topHints.length > 0) {
         setSelectedHint(topHints[0]);
         setStatusBanner(
-          `Showing top ${topHints.length} hints — click any numbered silhouette on the board to inspect.`,
+          `Top ${topHints.length} hints ready — click any marker to inspect or play immediately.`,
         );
-        await requestHintExplanation(
+        // Generate Ollama explanation asynchronously without blocking board clicks
+        requestHintExplanation(
           targetBoard,
           targetColor,
           topHints[0].move,
@@ -674,21 +741,18 @@ export default function App() {
           targetKo,
           'hint',
         );
-      } else {
-        setSenseiLoading(false);
       }
     } catch (err) {
       setStatusBanner(`Hint error: ${err.message}`);
-      setSenseiLoading(false);
+      setHintsLoading(false);
     }
   };
 
   const handleHintClick = async (hint) => {
-    if (senseiLoading) return;
     if (selectedHint?.move === hint.move) {
       if (activeTab === 'dojo') {
         await handlePuzzleIntersectionClick(hint.row, hint.col);
-      } else {
+      } else if (activeTab === 'match') {
         await handleIntersectionClick(hint.row, hint.col);
       }
       return;
@@ -696,10 +760,10 @@ export default function App() {
     const targetBoard = activeTab === 'dojo' ? puzzleBoard : board;
     const targetColor =
       activeTab === 'dojo' ? currentPuzzle?.turn || BLACK : currentTurn;
-    const targetKo = activeTab === 'dojo' ? null : koPoint;
+    const targetKo = activeTab === 'match' ? koPoint : null;
 
     setSelectedHint(hint);
-    await requestHintExplanation(
+    requestHintExplanation(
       targetBoard,
       targetColor,
       hint.move,
@@ -924,6 +988,18 @@ export default function App() {
             Puzzle Dojo ({progressStats.totalSolved})
           </button>
           <button
+            className={activeTab === 'joseki' ? 'active' : ''}
+            onClick={() => {
+              clearCoaching();
+              setActiveTab('joseki');
+              setStatusBanner(
+                'Joseki & Opening Explorer: Click any numbered marker (1–4) to step through 9x9 variations.',
+              );
+            }}
+          >
+            Joseki Explorer
+          </button>
+          <button
             className={activeTab === 'progress' ? 'active' : ''}
             onClick={() => {
               setActiveTab('progress');
@@ -1035,6 +1111,227 @@ export default function App() {
               )}
             </div>
           </section>
+        ) : activeTab === 'joseki' ? (
+          <>
+            <section className="board-pane">
+              <Goban9x9
+                board={josekiState.board}
+                currentTurn={josekiState.turn}
+                lastMove={josekiState.lastMove}
+                hints={josekiState.nextMarkers}
+                territoryMap={territoryOverlay}
+                chainLiberties={libertiesOverlay}
+                onHintClick={(marker) => {
+                  clearCoaching();
+                  setJosekiPath((prev) => [...prev, marker.node]);
+                  setStatusBanner(`${marker.node.move} — ${marker.node.term}`);
+                }}
+                onIntersectionClick={(r, c) => {
+                  const found = josekiState.nextMarkers.find(
+                    (m) => m.row === r && m.col === c,
+                  );
+                  if (found) {
+                    clearCoaching();
+                    setJosekiPath((prev) => [...prev, found.node]);
+                    setStatusBanner(`${found.node.move} — ${found.node.term}`);
+                  }
+                }}
+              />
+              {renderOverlayStrip()}
+            </section>
+
+            <aside className="control-pane">
+              <div className="panel-card">
+                <div className="sensei-header">
+                  <h2>Opening Sequence Path</h2>
+                  <span className="model-tag">
+                    Move #{josekiPath.length} (
+                    {josekiState.turn === BLACK ? 'Black' : 'White'} Next)
+                  </span>
+                </div>
+
+                <div className="drill-strip">
+                  <button
+                    className={`drill-chip ${josekiPath.length === 0 ? 'active' : ''}`}
+                    onClick={() => {
+                      clearCoaching();
+                      setJosekiPath([]);
+                    }}
+                  >
+                    Root
+                  </button>
+                  {josekiPath.map((node, idx) => (
+                    <button
+                      key={`${node.move}-${idx}`}
+                      className={`drill-chip ${idx === josekiPath.length - 1 ? 'active' : ''}`}
+                      onClick={() => {
+                        clearCoaching();
+                        setJosekiPath((prev) => prev.slice(0, idx + 1));
+                      }}
+                    >
+                      {idx + 1}. {node.move}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="sym-grid-2 mt-10">
+                  <button
+                    onClick={() => {
+                      clearCoaching();
+                      setJosekiPath((prev) => prev.slice(0, -1));
+                    }}
+                    disabled={josekiPath.length === 0}
+                  >
+                    &lt; Step Back
+                  </button>
+                  <button
+                    className="danger"
+                    onClick={() => {
+                      clearCoaching();
+                      setJosekiPath([]);
+                    }}
+                    disabled={josekiPath.length === 0}
+                  >
+                    Reset Tree
+                  </button>
+                </div>
+              </div>
+
+              <div className="panel-card">
+                <div className="sensei-header">
+                  <h2>
+                    {josekiState.currentNode.move
+                      ? `${josekiState.currentNode.move} — ${josekiState.currentNode.term}`
+                      : josekiState.currentNode.term}
+                  </h2>
+                </div>
+                <p
+                  style={{
+                    fontSize: '0.84rem',
+                    margin: '0 0 12px 0',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {josekiState.currentNode.summary}
+                </p>
+
+                {josekiState.nextMarkers.length > 0 ? (
+                  <>
+                    <h2>
+                      Next Continuations (
+                      {josekiState.turn === BLACK ? 'Black' : 'White'})
+                    </h2>
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                      }}
+                    >
+                      {josekiState.nextMarkers.map((m) => (
+                        <button
+                          key={m.move}
+                          style={{
+                            height: 'auto',
+                            padding: '8px 10px',
+                            textAlign: 'left',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                          }}
+                          onClick={() => {
+                            clearCoaching();
+                            setJosekiPath((prev) => [...prev, m.node]);
+                            setStatusBanner(`${m.node.move} — ${m.node.term}`);
+                          }}
+                        >
+                          <span>
+                            <strong style={{ color: 'var(--accent)' }}>
+                              #{m.rank} {m.move}
+                            </strong>{' '}
+                            — {m.node.term}
+                          </span>
+                          <span
+                            style={{
+                              color: 'var(--muted)',
+                              fontSize: '0.74rem',
+                            }}
+                          >
+                            &gt;
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="muted">
+                    End of this book line — step back to explore an alternate
+                    branch or ask Sensei below!
+                  </p>
+                )}
+              </div>
+
+              <div className="panel-card sensei-card">
+                <div className="sensei-header">
+                  <h2>Sensei Position Read</h2>
+                  <div className="model-toggle-group">
+                    <button
+                      type="button"
+                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:3b' ? 'active' : ''}`}
+                      onClick={() => setSenseiModel('qwen2.5-coder:3b')}
+                      disabled={senseiLoading}
+                    >
+                      3B Fast
+                    </button>
+                    <button
+                      type="button"
+                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:7b' ? 'active' : ''}`}
+                      onClick={() => setSenseiModel('qwen2.5-coder:7b')}
+                      disabled={senseiLoading}
+                    >
+                      7B Deep
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  style={{ width: '100%' }}
+                  onClick={() => {
+                    if (!josekiState.currentNode.move) return;
+                    const playedColor =
+                      josekiState.turn === BLACK ? WHITE : BLACK;
+                    requestHintExplanation(
+                      josekiState.board,
+                      playedColor,
+                      josekiState.currentNode.move,
+                      [],
+                      null,
+                      'last_move',
+                    );
+                  }}
+                  disabled={!josekiState.currentNode.move || senseiLoading}
+                >
+                  Ask Sensei About This Shape
+                </button>
+
+                <div className="sensei-output mt-10">
+                  {senseiLoading ? (
+                    <p className="muted">Consulting Sensei via Ollama...</p>
+                  ) : explanationData ? (
+                    <div className="explain-body">
+                      {renderFormattedSenseiText(explanationData.explanation)}
+                    </div>
+                  ) : (
+                    <p className="muted">
+                      Step into any opening variation and click{' '}
+                      <strong>Ask Sensei About This Shape</strong> for a
+                      tactical breakdown.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </aside>
+          </>
         ) : activeTab === 'dojo' ? (
           <>
             <section className="board-pane">
@@ -1186,7 +1483,7 @@ export default function App() {
                   <button
                     className={hints.length > 0 ? 'active' : ''}
                     onClick={handleRequestHints}
-                    disabled={puzzleSolved || senseiLoading}
+                    disabled={puzzleSolved || hintsLoading}
                   >
                     {hints.length > 0 ? 'Refresh Hints' : 'Ask Sensei (4)'}
                   </button>
@@ -1409,9 +1706,7 @@ export default function App() {
                   <button
                     className={hints.length > 0 ? 'active' : ''}
                     onClick={handleRequestHints}
-                    disabled={
-                      Boolean(gameResult) || aiThinking || senseiLoading
-                    }
+                    disabled={Boolean(gameResult) || aiThinking || hintsLoading}
                   >
                     {hints.length > 0 ? 'Refresh Hints' : 'Ask Sensei (4)'}
                   </button>
@@ -1437,7 +1732,6 @@ export default function App() {
                           selectedHint?.move === h.move ? 'active' : ''
                         }
                         onClick={() => handleHintClick(h)}
-                        disabled={senseiLoading}
                         title={`Winrate ${h.winrate}% (${h.scoreLead >= 0 ? '+' : ''}${h.scoreLead})`}
                       >
                         #{h.rank} {h.move}

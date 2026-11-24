@@ -15,6 +15,7 @@ from metrics_db import (
 )
 
 PUZZLES_DIR = Path(__file__).parent / "puzzles"
+JOSEKI_FILE = Path(__file__).parent / "joseki" / "9x9_openings.json"
 init_db()
 
 from go_rules import BOARD_SIZE, BLACK, WHITE, apply_move, to_coord
@@ -198,6 +199,14 @@ def list_puzzles():
         "packs": _load_all_packs(),
         "progress": get_progress_summary(),
     }
+
+
+@app.get("/api/joseki")
+def get_joseki_tree():
+    if not JOSEKI_FILE.exists():
+        return {"title": "9x9 Joseki Explorer", "root": {"move": None, "children": []}}
+    with open(JOSEKI_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 @app.post("/api/puzzles/attempt")
