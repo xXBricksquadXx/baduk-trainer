@@ -14,7 +14,7 @@ An interactive 9x9 Go (Baduk) trainer pairing a calibrated 30 Kyu – 1 Dan engi
 
 ### 9x9 Opening & Joseki Explorer Preview
 
-![9x9 Opening & Joseki Explorer](<img width="1447" height="1000" alt="Screenshot 2026-11-24 142351" src="https://github.com/user-attachments/assets/409f998d-a601-40fb-9a11-f3f21bcf8fe2" />)
+![9x9 Opening & Joseki Explorer](/frontend/public/joseki-preview.png)
 
 ---
 
