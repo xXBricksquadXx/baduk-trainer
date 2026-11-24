@@ -11,11 +11,6 @@ An interactive 9x9 Go (Baduk) trainer pairing a calibrated 30 Kyu – 1 Dan engi
 <div align="center">
   <video src="https://github.com/user-attachments/assets/7c9abe56-00d6-4987-a514-3f580ca8602d" width="100%" controls autoplay loop muted></video>
 </div>
-
-### 9x9 Opening & Joseki Explorer Preview
-
-![9x9 Opening & Joseki Explorer](/frontend/public/joseki-preview.png)
-
 ---
 
 ## Why AI Sensei 9x9?
