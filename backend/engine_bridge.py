@@ -49,10 +49,10 @@ def rank_label_to_strength(rank: str) -> Dict[str, Any]:
         dan = max(1, min(9, int(r[:-1] or 1)))
         return {
             "label": f"{dan} Dan",
-            "shortlist_size": 8,
-            "rollouts": 90 + dan * 15,
-            "noise": 0.04,
-            "tactical_mult": 1.4,
+            "shortlist_size": 4,
+            "rollouts": 115 + dan * 15,
+            "noise": 0.03,
+            "tactical_mult": 1.45,
             "blunder_rate": 0.0,
         }
 
@@ -64,14 +64,17 @@ def rank_label_to_strength(rank: str) -> Dict[str, Any]:
             kyu = 20
 
     skill = (31 - kyu) / 30.0  # 0.033 at 30k -> 1.0 at 1k
-    shortlist_size = int(36 - skill * 28)  # 35 at 30k -> 8 at 1k
+    # Tightens candidate pool from 35 (30k) -> 16 (15k) -> 4 (3k/1k)
+    shortlist_size = int(36 - skill * 32)
     return {
         "label": f"{kyu} Kyu",
-        "shortlist_size": max(8, shortlist_size),
-        "rollouts": int(4 + skill * 76),
-        "noise": round(max(0.06, (1.0 - skill) * 4.5), 2),
-        "tactical_mult": round(0.25 + skill * 1.05, 2),
-        "blunder_rate": round(max(0.0, (kyu - 18) / 20.0), 2),
+        "shortlist_size": max(4, shortlist_size),
+        "rollouts": int(6 + (skill**1.25) * 100),
+        "noise": round(max(0.05, (1.0 - skill) * 4.5), 2),
+        "tactical_mult": round(0.25 + skill * 1.15, 2),
+        "blunder_rate": round(
+            max(0.0, (kyu - 18) / 20.0), 2
+        ),  # 0.60 at 30k, 0.0 at 18k and stronger
     }
 
 

@@ -19,11 +19,15 @@ const API_BASE = 'http://127.0.0.1:8000/api';
 
 const RANK_OPTIONS = [
   { value: '30k', label: '30 Kyu — Beginner' },
-  { value: '25k', label: '25 Kyu — Novice' },
-  { value: '20k', label: '20 Kyu — Casual' },
-  { value: '15k', label: '15 Kyu — Developing' },
-  { value: '10k', label: '10 Kyu — Intermediate' },
-  { value: '5k', label: '5 Kyu — Strong Kyu' },
+  { value: '27k', label: '27 Kyu — Foundations' },
+  { value: '24k', label: '24 Kyu — Novice' },
+  { value: '21k', label: '21 Kyu — Developing' },
+  { value: '18k', label: '18 Kyu — Club Entry' },
+  { value: '15k', label: '15 Kyu — Solid Kyu' },
+  { value: '12k', label: '12 Kyu — Intermediate' },
+  { value: '9k', label: '9 Kyu — Single-Digit Kyu' },
+  { value: '6k', label: '6 Kyu — Strong Kyu' },
+  { value: '3k', label: '3 Kyu — Pre-Dan' },
   { value: '1d', label: '1 Dan — Shodan' },
 ];
 

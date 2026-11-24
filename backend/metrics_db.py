@@ -64,7 +64,6 @@ def init_db() -> None:
                 played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
-        # Safe column migration if upgrading from Milestone 4 DB
         cols_p = [
             r["name"]
             for r in conn.execute("PRAGMA table_info(puzzle_attempts)").fetchall()
@@ -82,6 +81,35 @@ def init_db() -> None:
             conn.execute(
                 "ALTER TABLE match_history ADD COLUMN rank_delta REAL NOT NULL DEFAULT 0.0"
             )
+
+
+def _compute_match_delta(
+    curr_rank: float, opp_num: float, won: bool, margin: float
+) -> float:
+    """
+    Honest Elo-style rank delta:
+    - Gap > 0: opponent is stronger than player.
+    - Gap < 0: opponent is weaker than player.
+    - Zero rating gain if beating an opponent > 3.0 Kyu weaker than current rating.
+    - Symmetric 50/50 expectation against equal opponents (no free inflation).
+    """
+    gap = curr_rank - opp_num
+
+    # Warm-up filter: beating a bot more than 3 Kyu weaker yields 0 rank gain
+    if won and gap < -3.0:
+        return 0.0
+
+    # Expected win probability (6.0 Kyu spread = ~90% expected win rate)
+    expected_win = 1.0 / (1.0 + (10.0 ** (-gap / 6.0)))
+    actual_score = 1.0 if won else 0.0
+
+    # K-factor: 0.85 base + small margin modifier up to +0.20 for decisive wins
+    margin_mod = min(0.20, max(0.0, margin) / 100.0) if won else 0.0
+    k_factor = 0.85 + margin_mod
+
+    # Negative delta improves Kyu (moves closer to 1.0k / Dan)
+    delta = -k_factor * (actual_score - expected_win)
+    return round(delta, 2)
 
 
 def record_puzzle_result(puzzle_id: str, category: str, solved: bool) -> Dict[str, Any]:
@@ -110,9 +138,9 @@ def record_puzzle_result(puzzle_id: str, category: str, solved: bool) -> Dict[st
                 """,
                 (new_solved, new_attempts, puzzle_id),
             )
-            # Partial lab credit if solving for the first time after previous misses (capped at 22k)
-            if solved and not already_solved and curr_rank > 22.0:
-                rank_shift = -0.15
+            # Partial lab credit capped strictly at 24.0k
+            if solved and not already_solved and curr_rank > 24.0:
+                rank_shift = -0.10
         else:
             first_try = 1 if solved else 0
             conn.execute(
@@ -122,9 +150,9 @@ def record_puzzle_result(puzzle_id: str, category: str, solved: bool) -> Dict[st
                 """,
                 (puzzle_id, category, 1 if solved else 0, first_try),
             )
-            # Full lab credit on clean first-try solve (drills alone carry you down to ~20.0k)
-            if solved and curr_rank > 20.0:
-                rank_shift = -0.35
+            # Clean first-try lab credit capped strictly at 22.0k
+            if solved and curr_rank > 22.0:
+                rank_shift = -0.25
 
         if rank_shift != 0.0:
             next_rank = max(-8.0, min(30.0, round(curr_rank + rank_shift, 2)))
@@ -151,26 +179,7 @@ def record_match_result(
         opp_num = _parse_rank_to_numeric(opponent_rank)
 
         won = winner.strip().lower() == human_color.strip().lower()
-        # Gap > 0 means opponent is stronger than player; Gap < 0 means opponent is weaker
-        gap = curr_rank - opp_num
-        margin_bonus = min(0.4, margin / 40.0)
-
-        if won:
-            if gap >= 0:
-                # Beat an equal or stronger opponent: high exam reward
-                delta = -(0.8 + min(1.4, gap * 0.22) + margin_bonus)
-            else:
-                # Beat a weaker opponent: diminishing returns
-                diminish = max(0.08, 1.0 + (gap * 0.14))
-                delta = -(0.55 * diminish)
-        else:
-            # Loss degrades rating (larger penalty if losing to a weaker opponent)
-            if gap <= 0:
-                delta = 0.65 + min(0.9, abs(gap) * 0.12)
-            else:
-                delta = 0.35  # Small penalty when losing to a much stronger teacher
-
-        delta = round(delta, 2)
+        delta = _compute_match_delta(curr_rank, opp_num, won, margin)
         next_rank = max(-8.0, min(30.0, round(curr_rank + delta, 2)))
 
         conn.execute(
@@ -183,6 +192,39 @@ def record_match_result(
             """,
             (opponent_rank, human_color, winner, margin, moves_count, delta),
         )
+
+    return get_progress_summary()
+
+
+def recalculate_honest_rank() -> Dict[str, Any]:
+    """Replays existing puzzles + match_history from 30.0k under the strict symmetric rubric."""
+    init_db()
+    with get_conn() as conn:
+        puzzles = conn.execute(
+            "SELECT solved, first_try_solved FROM puzzle_attempts ORDER BY id ASC"
+        ).fetchall()
+        rank = 30.0
+        for p in puzzles:
+            if p["solved"] == 1:
+                if p["first_try_solved"] == 1 and rank > 22.0:
+                    rank = round(rank - 0.25, 2)
+                elif rank > 24.0:
+                    rank = round(rank - 0.10, 2)
+
+        matches = conn.execute(
+            "SELECT id, opponent_rank, human_color, winner, margin FROM match_history ORDER BY id ASC"
+        ).fetchall()
+        for m in matches:
+            opp_num = _parse_rank_to_numeric(m["opponent_rank"])
+            won = m["winner"].strip().lower() == m["human_color"].strip().lower()
+            delta = _compute_match_delta(rank, opp_num, won, float(m["margin"]))
+            rank = max(-8.0, min(30.0, round(rank + delta, 2)))
+            conn.execute(
+                "UPDATE match_history SET rank_delta = ? WHERE id = ?",
+                (delta, m["id"]),
+            )
+
+        conn.execute("UPDATE player_profile SET numeric_rank = ? WHERE id = 1", (rank,))
 
     return get_progress_summary()
 
@@ -214,7 +256,6 @@ def get_progress_summary() -> Dict[str, Any]:
                 by_category[cat]["firstTry"] += 1
             by_category[cat]["reps"] += r["attempts"]
 
-        # All-time SQLite match aggregation (scales cleanly to 50+ / 500+ games)
         agg = conn.execute("""
             SELECT
                 COUNT(*) AS total_matches,
@@ -230,7 +271,21 @@ def get_progress_summary() -> Dict[str, Any]:
             round((total_wins / total_matches) * 100, 1) if total_matches > 0 else 0.0
         )
 
-        # Last 10 matches for clean UI display
+        # Highest bot rank defeated at least twice (Verified Benchmark)
+        verified_rows = conn.execute("""
+            SELECT opponent_rank, COUNT(*) AS wins
+            FROM match_history
+            WHERE LOWER(winner) = LOWER(human_color)
+            GROUP BY LOWER(opponent_rank)
+            HAVING wins >= 2
+            """).fetchall()
+        verified_str = "Unranked"
+        if verified_rows:
+            strongest_num = min(
+                _parse_rank_to_numeric(r["opponent_rank"]) for r in verified_rows
+            )
+            verified_str = _format_numeric_rank(strongest_num).replace(".0 ", " ")
+
         recent_matches = conn.execute("""
             SELECT opponent_rank, human_color, winner, margin, moves_count, rank_delta, played_at
             FROM match_history
@@ -254,4 +309,5 @@ def get_progress_summary() -> Dict[str, Any]:
             "avgWinMargin": avg_win_margin,
             "numericRank": curr_rank,
             "estimatedRank": _format_numeric_rank(curr_rank),
+            "verifiedRank": verified_str,
         }
