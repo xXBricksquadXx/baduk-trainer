@@ -209,6 +209,38 @@
       "wrongHints": {
         "default": "Push around the end of White's wall at F2 first, then connect back at E2 after White blocks at F1."
       }
+    },
+    {
+      "id": "yose-07",
+      "title": "SGF Lesson: Don't Play Inside Won Territory!",
+      "rank": "16k",
+      "concept": "In Area Scoring (Chinese rules), playing extra stones inside your own sealed territory reduces your net score by 1 point per stone—and can even fill your own eye! Once an enemy corner group has no way to make 2 eyes, leave it dead and play the last open border.",
+      "prompt": "White's corner stones (A9, B9) are already dead inside your sealed upper-left wall, while one neutral border point remains at E3. Play the productive move instead of filling your own territory!",
+      "turn": 1,
+      "stones": [
+        { "coord": "A9", "color": 2 },
+        { "coord": "B9", "color": 2 },
+        { "coord": "C9", "color": 1 },
+        { "coord": "C8", "color": 1 },
+        { "coord": "B7", "color": 1 },
+        { "coord": "A7", "color": 1 },
+        { "coord": "E4", "color": 1 },
+        { "coord": "F4", "color": 1 },
+        { "coord": "E2", "color": 2 },
+        { "coord": "F3", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "E3",
+          "reply": null,
+          "feedback": "Disciplined endgame! E3 claims the last open border point while leaving A8/B8 open so you don't waste points inside your own territory."
+        }
+      ],
+      "wrongHints": {
+        "A8": "A9-B9 is already completely dead! Playing inside your own territory at A8 costs you 1 point—claim the open border at E3 instead.",
+        "B8": "A9-B9 is already dead—don't spend a stone inside your own territory! Seal the open border at E3.",
+        "default": "Leave the dead White stones in the top-left alone and play the last open boundary point at E3."
+      }
     }
   ]
 }

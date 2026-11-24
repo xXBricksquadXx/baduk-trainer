@@ -183,6 +183,35 @@
       "wrongHints": {
         "default": "Drive straight up the middle between C6 and G6 (play E6 or E5) so White cannot connect across the top."
       }
+    },
+    {
+      "id": "mid-07",
+      "title": "SGF Lesson: Protect Your Wall's Base Before Small Edge Moves",
+      "rank": "16k",
+      "concept": "When an opponent's stones (H3, F2) threaten to cut underneath a large central-right group (F3-F4-G4-H4), defend that cutting base immediately—a 12-point group survival is always bigger than a 2-point corner push.",
+      "prompt": "Your 4-stone group (F3, F4, G4, H4) is threatened from below by White's H3 and F2 stones. Block White's cut at G2 before your group gets surrounded!",
+      "turn": 1,
+      "stones": [
+        { "coord": "F3", "color": 1 },
+        { "coord": "F4", "color": 1 },
+        { "coord": "G4", "color": 1 },
+        { "coord": "H4", "color": 1 },
+        { "coord": "J4", "color": 1 },
+        { "coord": "H3", "color": 2 },
+        { "coord": "F2", "color": 2 },
+        { "coord": "G5", "color": 2 },
+        { "coord": "H5", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "G2",
+          "reply": null,
+          "feedback": "Saved! G2 connects F3 underneath and splits White's F2 and H3 stones apart—your entire right-side wall stays alive with easy base room!"
+        }
+      ],
+      "wrongHints": {
+        "default": "Look at the open 2nd-line gap at G2 between F3 and H3—if White plays G2, your entire F3-H4 group loses its base and gets captured!"
+      }
     }
   ]
 }

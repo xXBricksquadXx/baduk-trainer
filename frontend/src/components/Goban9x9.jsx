@@ -298,6 +298,8 @@ export default function Goban9x9({
         {/* Toggleable Chain Liberties Badges */}
         {chainLiberties.map((ch) => {
           const { x, y } = getXY(ch.row, ch.col);
+          const dx = ch.col === BOARD_SIZE - 1 ? -14 : 14;
+          const dy = ch.row === 0 ? 14 : -14;
           const badgeBg =
             ch.liberties === 1
               ? '#dc2626'
@@ -314,7 +316,7 @@ export default function Goban9x9({
             <g
               key={`lib-${ch.row}-${ch.col}`}
               pointerEvents="none"
-              transform={`translate(${x + 14}, ${y - 14})`}
+              transform={`translate(${x + dx}, ${y + dy})`}
             >
               <circle
                 r="10.5"

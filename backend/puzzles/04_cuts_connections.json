@@ -146,6 +146,32 @@
       "wrongHints": {
         "default": "Drive straight into the open space at D5 between C5 and E5!"
       }
+    },
+    {
+      "id": "shape-07",
+      "title": "SGF Lesson: Seal the 2nd-Line Skirt",
+      "rank": "19k",
+      "concept": "When you hold a central triangle (D3, E5, F3) and the opponent presses from below on the 2nd line (F2), block solidly at E2 rather than jumping away to D2—keeping your bottom border completely connected.",
+      "prompt": "Black holds D3, E5, and F3 while White presses underneath at E3 and F2. Seal the bottom border solidly!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D3", "color": 1 },
+        { "coord": "E5", "color": 1 },
+        { "coord": "F3", "color": 1 },
+        { "coord": "E3", "color": 2 },
+        { "coord": "F2", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "E2",
+          "reply": null,
+          "feedback": "Solid shape! E2 puts White's E3 stone in Atari and links D3 and F3 together so White cannot slide underneath."
+        }
+      ],
+      "wrongHints": {
+        "D2": "D2 leaves a gap at E2 where White can wedge between D3 and F3! Block directly at E2 instead.",
+        "default": "Play E2 right underneath E3 to connect D3 and F3 into a single wall."
+      }
     }
   ]
 }

@@ -94,6 +94,15 @@ def _fallback_explanation(
     top_candidates: List[Dict[str, Any]],
     mode: str,
 ) -> str:
+    if (
+        candidate_info
+        and "all borders sealed — pass recommended" in candidate_info.get("tags", [])
+    ):
+        return (
+            f"All territory borders are 100% sealed (zero neutral dame points left). "
+            f"Playing {target_move} inside your own territory adds +0 net points under Area Scoring — click Pass now to lock in the game!"
+        )
+
     best = top_candidates[0] if top_candidates else None
     if candidate_info:
         tags_str = ", ".join(candidate_info.get("tags", ["develops shape"]))
@@ -170,6 +179,14 @@ async def explain_move_with_sensei(
         f"White groups in Atari (1 liberty): {', '.join(tactics['white_atari']) or 'None'}"
     )
 
+    sealed_note = (
+        "\nIMPORTANT ENDGAME RULE: Every empty region on this board is already 100% sealed by one color (zero neutral dame points remain). "
+        "Playing inside already-sealed territory yields +0 points under Area Scoring—advise the student to click Pass now."
+        if top_candidates
+        and "all borders sealed — pass recommended" in top_candidates[0].get("tags", [])
+        else ""
+    )
+
     task_instruction = (
         f"The student (calibrating around {user_rank}) clicked Hint Silhouette #{candidate_info['rank']} at {target_move} for {turn_label}."
         if mode == "hint" and candidate_info
@@ -194,7 +211,7 @@ Engine Top 4 Candidates for {turn_label}:
 {candidates_summary}
 
 Task:
-{task_instruction}
+{task_instruction}{sealed_note}
 
 Respond in exactly 3 concise bullet points (under 100 words total):
 - **Core Purpose:** What {target_move} accomplishes (territory, center influence, cutting/connecting, or liberty pressure).
@@ -221,7 +238,7 @@ Respond in exactly 3 concise bullet points (under 100 words total):
             except httpx.ConnectError as exc:
                 last_error = f"Ollama unreachable on 127.0.0.1:11434 ({exc})"
                 logger.warning(f"[SenseiAgent] {last_error}")
-                break  # No point retrying another model if daemon is down
+                break
             except httpx.TimeoutException as exc:
                 last_error = f"{candidate_model} timed out ({exc})"
                 logger.warning(f"[SenseiAgent] {last_error} — trying next fallback")

@@ -64,7 +64,6 @@ def rank_label_to_strength(rank: str) -> Dict[str, Any]:
             kyu = 20
 
     skill = (31 - kyu) / 30.0  # 0.033 at 30k -> 1.0 at 1k
-    # At 30k, shortlist spans almost the entire board with high noise & missed ataris
     shortlist_size = int(36 - skill * 28)  # 35 at 30k -> 8 at 1k
     return {
         "label": f"{kyu} Kyu",
@@ -72,9 +71,7 @@ def rank_label_to_strength(rank: str) -> Dict[str, Any]:
         "rollouts": int(4 + skill * 76),
         "noise": round(max(0.06, (1.0 - skill) * 4.5), 2),
         "tactical_mult": round(0.25 + skill * 1.05, 2),
-        "blunder_rate": round(
-            max(0.0, (kyu - 18) / 20.0), 2
-        ),  # 0.60 at 30k, 0.0 below 18k
+        "blunder_rate": round(max(0.0, (kyu - 18) / 20.0), 2),
     }
 
 
@@ -93,6 +90,34 @@ def _is_true_eye(board: List[List[int]], row: int, col: int, color: int) -> bool
                 if board[rr][cc] == color:
                     diag_friendly += 1
     return diag_friendly >= max(1, diag_total - 1)
+
+
+def _all_borders_sealed(board: List[List[int]]) -> bool:
+    """Returns True when every empty region on the board touches only ONE stone color (zero neutral dame)."""
+    has_black = any(cell == BLACK for row in board for cell in row)
+    has_white = any(cell == WHITE for row in board for cell in row)
+    if not (has_black and has_white):
+        return False
+
+    visited = set()
+    for r in range(BOARD_SIZE):
+        for c in range(BOARD_SIZE):
+            if board[r][c] == EMPTY and (r, c) not in visited:
+                borders = set()
+                stack = [(r, c)]
+                visited.add((r, c))
+                while stack:
+                    cr, cc = stack.pop()
+                    for nr, nc in get_neighbors(cr, cc):
+                        cell = board[nr][nc]
+                        if cell == EMPTY and (nr, nc) not in visited:
+                            visited.add((nr, nc))
+                            stack.append((nr, nc))
+                        elif cell in (BLACK, WHITE):
+                            borders.add(cell)
+                if len(borders) != 1:
+                    return False
+    return True
 
 
 def _evaluate_tactical_move(
@@ -141,7 +166,6 @@ def _evaluate_tactical_move(
                 score += 0.8
                 tags.append("pressures opponent liberties")
         elif board[nr][nc] == color:
-            # Check if we rescued an allied group that was in atari
             _, old_libs = get_group_and_liberties(board, nr, nc)
             if old_libs == 1 and self_libs > 1:
                 score += 3.5
@@ -222,8 +246,8 @@ def evaluate_candidates(
         scored.append((heur_score, r, c, tags))
 
     scored.sort(key=lambda x: x[0], reverse=True)
+    borders_sealed = _all_borders_sealed(board)
 
-    # At 30k, mix in lower-ranked legal moves so the bot makes natural beginner mistakes
     pool_limit = profile["shortlist_size"]
     if profile["blunder_rate"] > 0 and len(scored) > 10:
         broad_pool = scored[:pool_limit]
@@ -250,6 +274,9 @@ def evaluate_candidates(
         blended_wr = 0.55 * sigmoid_prior + 0.45 * mc_winrate
         noise = random.gauss(0, 0.05 * profile["noise"])
         final_score = blended_wr + noise
+        final_tags = (
+            ["all borders sealed — pass recommended"] + tags if borders_sealed else tags
+        )
         candidates.append(
             {
                 "row": r,
@@ -257,7 +284,7 @@ def evaluate_candidates(
                 "move": to_coord(r, c),
                 "winrate": round(max(0.02, min(0.98, blended_wr)) * 100, 1),
                 "scoreLead": round((blended_wr - 0.5) * 18.0, 1),
-                "tags": tags,
+                "tags": final_tags,
                 "_sort": final_score,
             }
         )
@@ -286,15 +313,17 @@ def choose_ai_move(
             "tags": ["no legal moves"],
         }
 
-    # Pass in late endgame if best move has very low value
+    # Pass in late endgame if all territory borders are sealed or only eye-filling remains
     stone_count = sum(1 for r in board for c in r if c != EMPTY)
-    if stone_count > 52 and candidates[0]["tags"] == ["fills own eye"]:
+    if _all_borders_sealed(board) or (
+        stone_count > 52 and candidates[0]["tags"] == ["fills own eye"]
+    ):
         return {
             "move": "PASS",
             "row": -1,
             "col": -1,
             "winrate": candidates[0]["winrate"],
-            "tags": ["endgame pass"],
+            "tags": ["all borders sealed — endgame pass"],
         }
 
     return candidates[0]
