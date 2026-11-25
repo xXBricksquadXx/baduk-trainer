@@ -172,6 +172,32 @@
         "D2": "D2 leaves a gap at E2 where White can wedge between D3 and F3! Block directly at E2 instead.",
         "default": "Play E2 right underneath E3 to connect D3 and F3 into a single wall."
       }
+    },
+    {
+      "id": "shape-08",
+      "title": "15k Sparring Drill: Defend the 2nd-Line Undercut",
+      "rank": "14k",
+      "concept": "When an opponent's stone pushes to E2 underneath your D3-E3 wall, block at D2 immediately—if you play elsewhere, White plays D2 next and slices your entire lower-left group off from its base.",
+      "prompt": "Black holds C4, C3, D3, and E3 while White pushes underneath at E2 (with F2 backup). Block the undercut before White splits your bottom wall!",
+      "turn": 1,
+      "stones": [
+        { "coord": "C4", "color": 1 },
+        { "coord": "C3", "color": 1 },
+        { "coord": "D3", "color": 1 },
+        { "coord": "E3", "color": 1 },
+        { "coord": "E2", "color": 2 },
+        { "coord": "F2", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "D2",
+          "reply": null,
+          "feedback": "Rock solid! D2 forms an unbreakable tiger's-mouth connection with C3 and D3, sealing the bottom-left corner and keeping E3 linked."
+        }
+      ],
+      "wrongHints": {
+        "default": "Play D2 right next to E2 to connect C3 and D3 underneath—leaving D2 open lets White push into D2 and cut your lower-left apart!"
+      }
     }
   ]
 }
