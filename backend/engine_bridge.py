@@ -150,10 +150,10 @@ def _evaluate_tactical_move(
         score -= 8.0
         tags.append("fills own eye")
 
-    # 3. Check self-group liberties (avoid self-atari)
-    _, self_libs = get_group_and_liberties(next_board, row, col)
+    # 3. Check self-group liberties (avoid self-atari, even when connecting to an in-atari stone)
+    self_stones, self_libs = get_group_and_liberties(next_board, row, col)
     if self_libs == 1 and res["captured_count"] == 0:
-        score -= 3.2
+        score -= 4.5 + 0.8 * len(self_stones)
         tags.append("self-atari risk")
     elif self_libs >= 3:
         score += 0.6
@@ -170,7 +170,7 @@ def _evaluate_tactical_move(
                 tags.append("pressures opponent liberties")
         elif board[nr][nc] == color:
             _, old_libs = get_group_and_liberties(board, nr, nc)
-            if old_libs == 1 and self_libs > 1:
+            if old_libs == 1 and self_libs >= 2:
                 score += 3.5
                 tags.append("defends group in atari")
 

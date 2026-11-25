@@ -215,7 +215,7 @@ Task:
 
 Respond in exactly 3 concise bullet points (under 100 words total):
 - **Core Purpose:** What {target_move} accomplishes (territory, center influence, cutting/connecting, or liberty pressure).
-- **Tactical Read:** How {target_move} interacts with its actual orthogonal neighbors and nearby liberties.
+- **Tactical Read:** Describe ONLY the direct orthogonal neighbors listed above for {target_move} (do NOT mention distant stones).
 - **Comparison:** How it compares to #1 ({best_move_label}) and one concrete Go principle to remember."""
 
     models_to_try = [model]
