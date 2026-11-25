@@ -1,5 +1,4 @@
 import math
-import os
 import random
 from pathlib import Path
 from typing import List, Optional, Tuple, Dict, Any
@@ -49,7 +48,7 @@ def rank_label_to_strength(rank: str) -> Dict[str, Any]:
         dan = max(1, min(9, int(r[:-1] or 1)))
         return {
             "label": f"{dan} Dan",
-            "shortlist_size": 4,
+            "shortlist_size": 3,
             "rollouts": 115 + dan * 15,
             "noise": 0.03,
             "tactical_mult": 1.45,
@@ -64,11 +63,11 @@ def rank_label_to_strength(rank: str) -> Dict[str, Any]:
             kyu = 20
 
     skill = (31 - kyu) / 30.0  # 0.033 at 30k -> 1.0 at 1k
-    # Tightens candidate pool from 35 (30k) -> 16 (15k) -> 4 (3k/1k)
+    # Tightens candidate pool from 35 (30k) -> 16 (15k) -> 3 (3k/1k)
     shortlist_size = int(36 - skill * 32)
     return {
         "label": f"{kyu} Kyu",
-        "shortlist_size": max(4, shortlist_size),
+        "shortlist_size": max(3, shortlist_size),
         "rollouts": int(6 + (skill**1.25) * 100),
         "noise": round(max(0.05, (1.0 - skill) * 4.5), 2),
         "tactical_mult": round(0.25 + skill * 1.15, 2),
@@ -150,13 +149,24 @@ def _evaluate_tactical_move(
         score -= 8.0
         tags.append("fills own eye")
 
-    # 3. Check self-group liberties (avoid self-atari, even when connecting to an in-atari stone)
+    # 3. Check self-group liberties (avoid self-atari & rescue 2-liberty multi-stone chains)
     self_stones, self_libs = get_group_and_liberties(next_board, row, col)
     if self_libs == 1 and res["captured_count"] == 0:
         score -= 4.5 + 0.8 * len(self_stones)
         tags.append("self-atari risk")
+    elif self_libs == 2 and len(self_stones) >= 3 and res["captured_count"] == 0:
+        score -= 1.6 + 0.35 * len(self_stones)
+        tags.append("low-liberty group risk")
     elif self_libs >= 3:
         score += 0.6
+        # Bonus if this move rescued a friendly group that previously had only 2 liberties
+        for nr, nc in get_neighbors(row, col):
+            if board[nr][nc] == color:
+                old_stones, old_libs = get_group_and_liberties(board, nr, nc)
+                if old_libs == 2 and len(old_stones) >= 2:
+                    score += 1.8 + 0.3 * len(old_stones)
+                    tags.append("extends 2-liberty group")
+                    break
 
     # 4. Check if move puts adjacent enemy groups into Atari (1 liberty) or reduces liberties
     for nr, nc in get_neighbors(row, col):
@@ -196,30 +206,62 @@ def _quick_rollout(
     ko_point: Optional[Tuple[int, int]],
     max_steps: int = 38,
 ) -> float:
-    """Fast stochastic playout returning +1 if `turn` wins, 0 otherwise."""
+    """Tactically-biased playout returning +1 if `turn` wins, 0 otherwise."""
     sim_board = [r[:] for r in board]
     curr = turn
     ko = ko_point
     passes = 0
+    last_pt: Optional[Tuple[int, int]] = None
 
     for _ in range(max_steps):
-        candidates = []
-        for _attempt in range(14):
-            r = random.randrange(BOARD_SIZE)
-            c = random.randrange(BOARD_SIZE)
-            if sim_board[r][c] == EMPTY and not _is_true_eye(sim_board, r, c, curr):
-                res = apply_move(sim_board, r, c, curr, ko)
-                if res["valid"]:
-                    candidates.append((r, c, res))
+        chosen_res = None
+        chosen_pt = None
+
+        # 1. Local tactical response: check liberties around the previous move first
+        if last_pt is not None:
+            lr, lc = last_pt
+            local_targets = [(lr, lc)] + get_neighbors(lr, lc)
+            for tr, tc in local_targets:
+                if sim_board[tr][tc] != EMPTY:
+                    stones, libs = get_group_and_liberties(sim_board, tr, tc)
+                    if libs == 1:
+                        # Find the single remaining liberty to either capture or escape
+                        for sr, sc in stones:
+                            for nr, nc in get_neighbors(sr, sc):
+                                if sim_board[nr][nc] == EMPTY and not _is_true_eye(
+                                    sim_board, nr, nc, curr
+                                ):
+                                    res = apply_move(sim_board, nr, nc, curr, ko)
+                                    if res["valid"]:
+                                        chosen_res = res
+                                        chosen_pt = (nr, nc)
+                                        break
+                            if chosen_res:
+                                break
+                if chosen_res:
                     break
-        if candidates:
-            _, _, res = candidates[0]
-            sim_board = res["board"]
-            ko = res["ko_point"]
+
+        # 2. Fallback to stochastic probes
+        if chosen_res is None:
+            for _attempt in range(14):
+                r = random.randrange(BOARD_SIZE)
+                c = random.randrange(BOARD_SIZE)
+                if sim_board[r][c] == EMPTY and not _is_true_eye(sim_board, r, c, curr):
+                    res = apply_move(sim_board, r, c, curr, ko)
+                    if res["valid"]:
+                        chosen_res = res
+                        chosen_pt = (r, c)
+                        break
+
+        if chosen_res is not None:
+            sim_board = chosen_res["board"]
+            ko = chosen_res["ko_point"]
+            last_pt = chosen_pt
             passes = 0
         else:
             passes += 1
             ko = None
+            last_pt = None
             if passes >= 2:
                 break
         curr = WHITE if curr == BLACK else BLACK
@@ -257,7 +299,7 @@ def evaluate_candidates(
         random.shuffle(broad_pool)
         shortlist = broad_pool[: max(top_k + 4, 8)]
     else:
-        shortlist = scored[: max(top_k + 4, 8)]
+        shortlist = scored[: max(top_k, pool_limit)]
 
     rollouts_per_move = max(2, profile["rollouts"] // len(shortlist))
 
@@ -319,7 +361,7 @@ def choose_ai_move(
     # Pass in late endgame if all territory borders are sealed or only eye-filling remains
     stone_count = sum(1 for r in board for c in r if c != EMPTY)
     if _all_borders_sealed(board) or (
-        stone_count > 52 and candidates[0]["tags"] == ["fills own eye"]
+        stone_count > 52 and "fills own eye" in candidates[0]["tags"]
     ):
         return {
             "move": "PASS",

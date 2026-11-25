@@ -1,33 +1,88 @@
 import json
-from metrics_db import recalculate_honest_rank
-from sensei_agent import explain_move_with_sensei
+from contextlib import asynccontextmanager
 from typing import List, Optional, Tuple
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from pathlib import Path
 
-from go_rules import create_empty_board, from_coord
-from metrics_db import (
-    init_db,
-    record_puzzle_result,
-    record_match_result,
-    get_progress_summary,
+from go_rules import (
+    BOARD_SIZE,
+    BLACK,
+    WHITE,
+    apply_move,
+    create_empty_board,
+    from_coord,
 )
-
-PUZZLES_DIR = Path(__file__).parent / "puzzles"
-JOSEKI_FILE = Path(__file__).parent / "joseki" / "9x9_openings.json"
-init_db()
-
-from go_rules import BOARD_SIZE, BLACK, WHITE, apply_move, to_coord
 from engine_bridge import (
     choose_ai_move,
     evaluate_candidates,
     detect_engine_backend,
     rank_label_to_strength,
 )
+from metrics_db import (
+    init_db,
+    record_puzzle_result,
+    record_match_result,
+    get_progress_summary,
+    recalculate_honest_rank,
+)
+from sensei_agent import explain_move_with_sensei
 
-app = FastAPI(title="Baduk Trainer 9x9 API", version="0.2.0")
+PUZZLES_DIR = Path(__file__).parent / "puzzles"
+JOSEKI_FILE = Path(__file__).parent / "joseki" / "9x9_openings.json"
+init_db()
+
+
+def _load_all_packs() -> List[dict]:
+    packs = []
+    if not PUZZLES_DIR.exists():
+        return packs
+    for fpath in sorted(PUZZLES_DIR.glob("*.json")):
+        with open(fpath, "r", encoding="utf-8") as f:
+            pack = json.load(f)
+            # Hydrate each puzzle with a ready-to-render 9x9 board matrix
+            for p in pack.get("puzzles", []):
+                b = create_empty_board()
+                for st in p.get("stones", []):
+                    rc = from_coord(st["coord"])
+                    if rc:
+                        b[rc[0]][rc[1]] = st["color"]
+                p["board"] = b
+            packs.append(pack)
+    return packs
+
+
+def _build_console_banner() -> str:
+    packs = _load_all_packs()
+    drill_count = sum(len(p.get("puzzles", [])) for p in packs)
+    stats = get_progress_summary()
+    engine = detect_engine_backend()
+
+    return rf"""
+  ___  _____   _____                      _   _____       _____
+ / _ \|_   _| /  ___|                    (_) |  _  |     |  _  |
+/ /_\ \ | |   \ `--.  ___ _ __  ___  ___  _  | |_| |_  __| |_| |
+|  _  | | |    `--. \/ _ \ '_ \/ __|/ _ \| | \____ \ \/ /\____ |
+| | | |_| |_  /\__/ /  __/ | | \__ \  __/| | .___/ />  < .___/ /
+\_| |_/\___/  \____/ \___|_| |_|___/\___||_| \____//_/\_\\____/
+
+       =[ AI Sensei 9x9 // Baduk Dojo Framework v0.2.0        ]
++ -- --=[ Engine  : {engine:<41} ]
++ -- --=[ Board   : {BOARD_SIZE}x{BOARD_SIZE} Goban | Ranks: 30 Kyu -> 1 Dan            ]
++ -- --=[ Dojo    : {len(packs)} Curriculum Packs ({drill_count} tactical drills)      ]
++ -- --=[ Profile : {stats['estimatedRank']:<10} | Record: {stats['matchWins']}W-{stats['totalMatches'] - stats['matchWins']}L ({stats['winRate']}%)     ]
++ -- --=[ Sensei  : Local Ollama Bridge (3B Fast / 7B Deep)   ]
+"""
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print(_build_console_banner(), flush=True)
+    yield
+
+
+app = FastAPI(title="Baduk Trainer 9x9 API", version="0.2.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -175,25 +230,6 @@ class MatchRecordRequest(BaseModel):
     movesCount: int
 
 
-def _load_all_packs() -> List[dict]:
-    packs = []
-    if not PUZZLES_DIR.exists():
-        return packs
-    for fpath in sorted(PUZZLES_DIR.glob("*.json")):
-        with open(fpath, "r", encoding="utf-8") as f:
-            pack = json.load(f)
-            # Hydrate each puzzle with a ready-to-render 9x9 board matrix
-            for p in pack.get("puzzles", []):
-                b = create_empty_board()
-                for st in p.get("stones", []):
-                    rc = from_coord(st["coord"])
-                    if rc:
-                        b[rc[0]][rc[1]] = st["color"]
-                p["board"] = b
-            packs.append(pack)
-    return packs
-
-
 @app.get("/api/puzzles")
 def list_puzzles():
     return {
@@ -327,3 +363,15 @@ def save_match_metric(req: MatchRecordRequest):
 @app.post("/api/metrics/recalculate")
 def recalc_metrics():
     return {"progress": recalculate_honest_rank()}
+
+
+@app.get("/api/system/banner")
+def system_banner():
+    packs = _load_all_packs()
+    return {
+        "banner": _build_console_banner(),
+        "engine": detect_engine_backend(),
+        "packsCount": len(packs),
+        "drillsCount": sum(len(p.get("puzzles", [])) for p in packs),
+        "progress": get_progress_summary(),
+    }
