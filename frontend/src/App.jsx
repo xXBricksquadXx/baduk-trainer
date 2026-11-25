@@ -1,14 +1,12 @@
 // frontend\src\App.jsx
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Goban9x9 from './components/Goban9x9';
 import { useMatchEngine, HANDICAP_OPTIONS } from './hooks/useMatchEngine';
+import { useDojoCurriculum } from './hooks/useDojoCurriculum';
+import { useSenseiCoach } from './hooks/useSenseiCoach';
 import {
   BLACK,
   WHITE,
-  createInitialBoard,
-  applyMove,
-  toCoordString,
-  fromCoordString,
   estimateAreaScore,
   computeTerritoryMap,
   computeChainLiberties,
@@ -54,414 +52,67 @@ export default function App() {
     'Black to play. Click an intersection to place a stone.',
   );
   const [aiRank, setAiRank] = useState('25k');
-  const [engineStatus, setEngineStatus] = useState('Checking engine...');
-
-  // Sensei Hints & Ollama Explanation State
-  const [hints, setHints] = useState([]);
-  const [selectedHint, setSelectedHint] = useState(null);
-  const [hintsLoading, setHintsLoading] = useState(false);
-  const [senseiLoading, setSenseiLoading] = useState(false);
-  const [explanationData, setExplanationData] = useState(null);
-  const [senseiModel, setSenseiModel] = useState('qwen2.5-coder:3b');
-
-  // Navigation & Curriculum State ('match' | 'dojo' | 'joseki' | 'progress')
   const [activeTab, setActiveTab] = useState('match');
-  const [puzzlePacks, setPuzzlePacks] = useState([]);
-  const [activePackIdx, setActivePackIdx] = useState(0);
-  const [activePuzzleIdx, setActivePuzzleIdx] = useState(0);
-  const [puzzleBoard, setPuzzleBoard] = useState(() => createInitialBoard(0));
-  const [puzzleLastMove, setPuzzleLastMove] = useState(null);
-  const [puzzleFeedback, setPuzzleFeedback] = useState(null);
-  const [puzzleSolved, setPuzzleSolved] = useState(false);
-  const [puzzleStepIndex, setPuzzleStepIndex] = useState(0);
-
-  // Milestone 8: 9x9 Opening & Joseki Explorer
-  const [josekiData, setJosekiData] = useState(null);
-  const [josekiPath, setJosekiPath] = useState([]);
-
-  const [progressStats, setProgressStats] = useState({
-    solvedIds: [],
-    totalSolved: 0,
-    firstTryAccuracy: 0,
-    totalReps: 0,
-    byCategory: {},
-    recentMatches: [],
-    totalMatches: 0,
-    matchWins: 0,
-    winRate: 0,
-    avgWinMargin: 0,
-    estimatedRank: '30.0 Kyu',
-  });
-
-  // Milestone 6: Goban Visual Overlays
   const [showTerritory, setShowTerritory] = useState(false);
   const [showLiberties, setShowLiberties] = useState(false);
 
-  const clearCoaching = useCallback(() => {
-    setHints([]);
-    setSelectedHint(null);
-    setExplanationData(null);
-  }, []);
+  const clearCoachingRef = useRef(() => {});
+  const clearCoaching = useCallback(() => clearCoachingRef.current(), []);
 
-  const {
-    handicapId,
-    activeHandicap,
-    board,
-    currentTurn,
-    captures,
-    koPoint,
-    moveHistory,
-    redoStack,
-    gameResult,
-    sgfMeta,
-    vsAi,
-    humanColor,
-    aiThinking,
-    lastMove,
-    lastBlackMove,
-    lastWhiteMove,
-    startFreshMatch,
-    handleIntersectionClick,
-    handlePass,
-    handleUndo,
-    handleRedo,
-    handleExportSgf,
-    handleImportSgfFile,
-  } = useMatchEngine({
+  const dojo = useDojoCurriculum({
+    apiBase: API_BASE,
+    clearCoaching,
+    setStatusBanner,
+  });
+
+  const match = useMatchEngine({
     apiBase: API_BASE,
     aiRank,
-    userRankLabel: progressStats.estimatedRank,
+    userRankLabel: dojo.progressStats.estimatedRank,
     setStatusBanner,
     clearCoaching,
-    onProgressUpdate: setProgressStats,
+    onProgressUpdate: dojo.setProgressStats,
     onSwitchToMatchTab: () => setActiveTab('match'),
   });
 
+  const coach = useSenseiCoach({
+    apiBase: API_BASE,
+    aiRank,
+    activeTab,
+    board: match.board,
+    currentTurn: match.currentTurn,
+    koPoint: match.koPoint,
+    gameResult: match.gameResult,
+    aiThinking: match.aiThinking,
+    lastMove: match.lastMove,
+    puzzleBoard: dojo.puzzleBoard,
+    currentPuzzle: dojo.currentPuzzle,
+    onPlayMatchMove: match.handleIntersectionClick,
+    onPlayPuzzleMove: dojo.handlePuzzleIntersectionClick,
+    setStatusBanner,
+  });
+
+  useEffect(() => {
+    clearCoachingRef.current = coach.clearCoaching;
+  }, [coach.clearCoaching]);
+
   const liveAdvantage =
     activeTab === 'match'
-      ? estimateAreaScore(board, activeHandicap.komi)
+      ? estimateAreaScore(match.board, match.activeHandicap.komi)
       : null;
-
-  // Compute current Joseki Explorer board & next candidate markers (1..N)
-  const josekiState = (() => {
-    let simBoard = createInitialBoard(0);
-    let simTurn = BLACK;
-    let lastPt = null;
-    for (const node of josekiPath) {
-      const parsed = fromCoordString(node.move);
-      if (parsed) {
-        const res = applyMove(simBoard, parsed.row, parsed.col, simTurn, null);
-        if (res.valid) {
-          simBoard = res.board;
-          lastPt = { row: parsed.row, col: parsed.col };
-          simTurn = simTurn === BLACK ? WHITE : BLACK;
-        }
-      }
-    }
-    const currentNode =
-      josekiPath.length > 0
-        ? josekiPath[josekiPath.length - 1]
-        : josekiData?.root || {
-            move: null,
-            term: 'Empty 9x9 Goban (Fuseki)',
-            summary: 'Select a starting point.',
-            children: [],
-          };
-    const nextMarkers = (currentNode.children || [])
-      .map((child, idx) => {
-        const parsed = fromCoordString(child.move);
-        if (!parsed) return null;
-        return {
-          rank: idx + 1,
-          move: child.move,
-          row: parsed.row,
-          col: parsed.col,
-          node: child,
-        };
-      })
-      .filter(Boolean);
-
-    return {
-      board: simBoard,
-      turn: simTurn,
-      lastMove: lastPt,
-      currentNode,
-      nextMarkers,
-    };
-  })();
 
   const activeBoardForOverlay =
     activeTab === 'dojo'
-      ? puzzleBoard
+      ? dojo.puzzleBoard
       : activeTab === 'joseki'
-        ? josekiState.board
-        : board;
+        ? dojo.josekiState.board
+        : match.board;
   const territoryOverlay = showTerritory
     ? computeTerritoryMap(activeBoardForOverlay)
     : null;
   const libertiesOverlay = showLiberties
     ? computeChainLiberties(activeBoardForOverlay)
     : [];
-
-  useEffect(() => {
-    fetch(`${API_BASE}/health`)
-      .then((res) => res.json())
-      .then((data) => setEngineStatus(`Engine: ${data.engine}`))
-      .catch(() => setEngineStatus('Backend offline'));
-
-    fetch(`${API_BASE}/puzzles`)
-      .then((res) => res.json())
-      .then((data) => {
-        const packs = data.packs || [];
-        setPuzzlePacks(packs);
-        if (data.progress) setProgressStats(data.progress);
-        if (packs.length > 0 && packs[0].puzzles?.length > 0) {
-          setPuzzleBoard(packs[0].puzzles[0].board);
-        }
-      })
-      .catch(() => {});
-
-    fetch(`${API_BASE}/joseki`)
-      .then((res) => res.json())
-      .then((data) => setJosekiData(data))
-      .catch(() => {});
-  }, []);
-
-  const requestHintExplanation = async (
-    targetBoard,
-    targetColor,
-    targetCoord,
-    candidateList,
-    activeKo,
-    mode = 'hint',
-  ) => {
-    setSenseiLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/explain`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          board: targetBoard,
-          color: targetColor,
-          targetMove: targetCoord,
-          candidates: candidateList,
-          koPoint: activeKo ? [activeKo.row, activeKo.col] : null,
-          mode,
-          rank: aiRank,
-          model: senseiModel,
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setExplanationData(data);
-    } catch (err) {
-      setExplanationData({
-        move: targetCoord,
-        explanation: `Sensei explanation unavailable: ${err.message}`,
-        model: 'offline',
-      });
-    } finally {
-      setSenseiLoading(false);
-    }
-  };
-
-  const handleRequestHints = async () => {
-    if (hintsLoading) return;
-    if (activeTab === 'match' && (gameResult || aiThinking)) return;
-
-    const targetBoard = activeTab === 'dojo' ? puzzleBoard : board;
-    const targetColor =
-      activeTab === 'dojo' ? currentPuzzle?.turn || BLACK : currentTurn;
-    const targetKo = activeTab === 'match' ? koPoint : null;
-
-    setHintsLoading(true);
-    setStatusBanner('Computing top 4 candidate moves...');
-    try {
-      const res = await fetch(`${API_BASE}/hints`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          board: targetBoard,
-          color: targetColor,
-          koPoint: targetKo ? [targetKo.row, targetKo.col] : null,
-          rank: '1d',
-        }),
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const topHints = data.hints || [];
-      setHints(topHints);
-      setHintsLoading(false);
-
-      if (topHints.length > 0) {
-        setSelectedHint(topHints[0]);
-        setStatusBanner(
-          `Top ${topHints.length} hints ready — click any marker to inspect or play immediately.`,
-        );
-        requestHintExplanation(
-          targetBoard,
-          targetColor,
-          topHints[0].move,
-          topHints,
-          targetKo,
-          'hint',
-        );
-      }
-    } catch (err) {
-      setStatusBanner(`Hint error: ${err.message}`);
-      setHintsLoading(false);
-    }
-  };
-
-  const handleHintClick = async (hint) => {
-    if (selectedHint?.move === hint.move) {
-      if (activeTab === 'dojo') {
-        await handlePuzzleIntersectionClick(hint.row, hint.col);
-      } else if (activeTab === 'match') {
-        await handleIntersectionClick(hint.row, hint.col);
-      }
-      return;
-    }
-    const targetBoard = activeTab === 'dojo' ? puzzleBoard : board;
-    const targetColor =
-      activeTab === 'dojo' ? currentPuzzle?.turn || BLACK : currentTurn;
-    const targetKo = activeTab === 'match' ? koPoint : null;
-
-    setSelectedHint(hint);
-    requestHintExplanation(
-      targetBoard,
-      targetColor,
-      hint.move,
-      hints,
-      targetKo,
-      'hint',
-    );
-  };
-
-  const handleExplainLastMove = async () => {
-    if (!lastMove || lastMove.row < 0 || senseiLoading || aiThinking) return;
-    setHints([]);
-    setSelectedHint(null);
-    await requestHintExplanation(
-      lastMove.board,
-      lastMove.color,
-      lastMove.coord,
-      [],
-      lastMove.koPoint,
-      'last_move',
-    );
-  };
-
-  // --- Puzzle Dojo Helpers ---
-  const currentPack = puzzlePacks[activePackIdx] || null;
-  const currentPuzzle = currentPack?.puzzles?.[activePuzzleIdx] || null;
-
-  const selectPuzzle = (pIdx, qIdx) => {
-    const pack = puzzlePacks[pIdx];
-    const puzz = pack?.puzzles?.[qIdx];
-    if (!puzz) return;
-    clearCoaching();
-    setActivePackIdx(pIdx);
-    setActivePuzzleIdx(qIdx);
-    setPuzzleBoard(puzz.board);
-    setPuzzleLastMove(null);
-    setPuzzleFeedback(null);
-    setPuzzleSolved(false);
-    setPuzzleStepIndex(0);
-    setStatusBanner(`Drill [${puzz.rank.toUpperCase()}]: ${puzz.title}`);
-  };
-
-  const handlePuzzleIntersectionClick = async (row, col) => {
-    if (!currentPuzzle || puzzleSolved) return;
-    const res = applyMove(puzzleBoard, row, col, currentPuzzle.turn, null);
-    if (!res.valid) {
-      setStatusBanner(`Illegal move: ${res.reason}`);
-      return;
-    }
-
-    const coord = toCoordString(row, col);
-    clearCoaching();
-    setPuzzleBoard(res.board);
-    setPuzzleLastMove({ row, col });
-
-    try {
-      const apiRes = await fetch(`${API_BASE}/puzzles/attempt`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          puzzleId: currentPuzzle.id,
-          category: currentPack.category,
-          move: coord,
-          stepIndex: puzzleStepIndex,
-        }),
-      });
-      const data = await apiRes.json();
-      if (data.progress) setProgressStats(data.progress);
-
-      if (data.solved) {
-        setPuzzleSolved(true);
-        setPuzzleFeedback({
-          status: 'solved',
-          text: data.feedback,
-          move: coord,
-        });
-        setStatusBanner(`Solved ${currentPuzzle.title} with ${coord}!`);
-      } else if (data.stepComplete) {
-        const nextIdx = data.nextStepIndex ?? puzzleStepIndex + 1;
-        setPuzzleStepIndex(nextIdx);
-        setPuzzleFeedback({
-          status: 'step',
-          text: data.feedback,
-          move: coord,
-        });
-        setStatusBanner(`Step ${nextIdx} complete — Opponent responding...`);
-
-        if (data.reply) {
-          const replyCoord = fromCoordString(data.reply);
-          if (replyCoord) {
-            const oppColor = currentPuzzle.turn === BLACK ? WHITE : BLACK;
-            setTimeout(() => {
-              const afterReply = applyMove(
-                res.board,
-                replyCoord.row,
-                replyCoord.col,
-                oppColor,
-                null,
-              );
-              if (afterReply.valid) {
-                setPuzzleBoard(afterReply.board);
-                setPuzzleLastMove({ row: replyCoord.row, col: replyCoord.col });
-                setStatusBanner(
-                  `Opponent played ${data.reply} — Play Step ${nextIdx + 1}!`,
-                );
-              }
-            }, 420);
-          }
-        }
-      } else {
-        setPuzzleFeedback({
-          status: 'retry',
-          text: data.feedback,
-          move: coord,
-        });
-        setStatusBanner(`Try again — ${coord} didn't solve the drill.`);
-        setTimeout(() => {
-          setPuzzleBoard(currentPuzzle.board);
-          setPuzzleLastMove(null);
-          setPuzzleStepIndex(0);
-        }, 850);
-      }
-    } catch (err) {
-      setStatusBanner(`Puzzle check error: ${err.message}`);
-    }
-  };
-
-  const stepPuzzle = (delta) => {
-    if (!currentPack) return;
-    const total = currentPack.puzzles.length;
-    const nextIdx = (activePuzzleIdx + delta + total) % total;
-    selectPuzzle(activePackIdx, nextIdx);
-  };
 
   const renderOverlayStrip = () => (
     <>
@@ -482,8 +133,8 @@ export default function App() {
         </button>
         {activeTab === 'match' ? (
           <button
-            onClick={handleExportSgf}
-            disabled={moveHistory.length === 0}
+            onClick={match.handleExportSgf}
+            disabled={match.moveHistory.length === 0}
             title="Download current game as a standard .sgf file"
           >
             Export SGF
@@ -517,14 +168,39 @@ export default function App() {
     </>
   );
 
+  const renderModelToggles = () => (
+    <div className="model-toggle-group">
+      <button
+        type="button"
+        className={`mini-toggle ${coach.senseiModel === 'qwen2.5-coder:3b' ? 'active' : ''}`}
+        onClick={() => coach.setSenseiModel('qwen2.5-coder:3b')}
+        disabled={coach.senseiLoading}
+        title="Fast ~2s tactical reads via qwen2.5-coder:3b"
+      >
+        3B Fast
+      </button>
+      <button
+        type="button"
+        className={`mini-toggle ${coach.senseiModel === 'qwen2.5-coder:7b' ? 'active' : ''}`}
+        onClick={() => coach.setSenseiModel('qwen2.5-coder:7b')}
+        disabled={coach.senseiLoading}
+        title="Deeper analysis via qwen2.5-coder:7b"
+      >
+        7B Deep
+      </button>
+    </div>
+  );
+
   return (
     <div className="app-shell">
       <header className="top-bar">
         <div className="brand">
           <img src="/logo.jpg" alt="AI Sensei 9x9" className="brand-logo" />
           <h1>AI Sensei 9x9</h1>
-          <span className="badge">{engineStatus}</span>
-          <span className="badge">Rank: {progressStats.estimatedRank}</span>
+          <span className="badge">{dojo.engineStatus}</span>
+          <span className="badge">
+            Rank: {dojo.progressStats.estimatedRank}
+          </span>
         </div>
 
         <nav className="top-nav">
@@ -534,9 +210,9 @@ export default function App() {
               clearCoaching();
               setActiveTab('match');
               setStatusBanner(
-                gameResult
-                  ? `Match complete — ${gameResult.winner} won by ${gameResult.margin} pts.`
-                  : `${currentTurn === BLACK ? 'Black' : 'White'} to play.`,
+                match.gameResult
+                  ? `Match complete — ${match.gameResult.winner} won by ${match.gameResult.margin} pts.`
+                  : `${match.currentTurn === BLACK ? 'Black' : 'White'} to play.`,
               );
             }}
           >
@@ -547,10 +223,11 @@ export default function App() {
             onClick={() => {
               clearCoaching();
               setActiveTab('dojo');
-              if (currentPuzzle) selectPuzzle(activePackIdx, activePuzzleIdx);
+              if (dojo.currentPuzzle)
+                dojo.selectPuzzle(dojo.activePackIdx, dojo.activePuzzleIdx);
             }}
           >
-            Puzzle Dojo ({progressStats.totalSolved})
+            Puzzle Dojo ({dojo.progressStats.totalSolved})
           </button>
           <button
             className={activeTab === 'joseki' ? 'active' : ''}
@@ -569,7 +246,7 @@ export default function App() {
             onClick={() => {
               setActiveTab('progress');
               setStatusBanner(
-                `Dojo Rubric: ${progressStats.estimatedRank} (${progressStats.totalSolved} drills mastered).`,
+                `Dojo Rubric: ${dojo.progressStats.estimatedRank} (${dojo.progressStats.totalSolved} drills mastered).`,
               );
             }}
           >
@@ -601,7 +278,7 @@ export default function App() {
                   <input
                     type="file"
                     accept=".sgf"
-                    onChange={handleImportSgfFile}
+                    onChange={match.handleImportSgfFile}
                     style={{ display: 'none' }}
                   />
                 </label>
@@ -610,30 +287,33 @@ export default function App() {
                 <div className="capture-box">
                   <span className="label">Estimated Rank</span>
                   <span className="value" style={{ color: 'var(--accent)' }}>
-                    {progressStats.estimatedRank}
+                    {dojo.progressStats.estimatedRank}
                   </span>
                 </div>
                 <div className="capture-box">
                   <span className="label">Drills Mastered</span>
-                  <span className="value">{progressStats.totalSolved}</span>
+                  <span className="value">
+                    {dojo.progressStats.totalSolved}
+                  </span>
                 </div>
                 <div className="capture-box">
                   <span className="label">Total Puzzle Reps</span>
-                  <span className="value">{progressStats.totalReps}</span>
+                  <span className="value">{dojo.progressStats.totalReps}</span>
                 </div>
                 <div className="capture-box">
                   <span className="label">All-Time Win Rate</span>
                   <span className="value">
-                    {progressStats.matchWins} / {progressStats.totalMatches} (
-                    {progressStats.winRate ?? 0}%)
+                    {dojo.progressStats.matchWins} /{' '}
+                    {dojo.progressStats.totalMatches} (
+                    {dojo.progressStats.winRate ?? 0}%)
                   </span>
                 </div>
               </div>
 
               <h2>Skill Category Breakdown</h2>
               <div className="sym-grid-2">
-                {puzzlePacks.map((pack) => {
-                  const catStats = progressStats.byCategory?.[
+                {dojo.puzzlePacks.map((pack) => {
+                  const catStats = dojo.progressStats.byCategory?.[
                     pack.category
                   ] || {
                     solved: 0,
@@ -655,14 +335,14 @@ export default function App() {
 
             <div className="panel-card mt-10">
               <h2>Last 10 AI Match Results</h2>
-              {progressStats.recentMatches?.length === 0 ? (
+              {dojo.progressStats.recentMatches?.length === 0 ? (
                 <p className="muted">
                   Complete a game (two consecutive passes) to record match
                   telemetry here.
                 </p>
               ) : (
                 <div className="move-log">
-                  {progressStats.recentMatches.map((m, i) => (
+                  {dojo.progressStats.recentMatches.map((m, i) => (
                     <div key={i} className="log-entry">
                       <span className="idx">#{i + 1}</span>
                       <span>vs {m.opponent_rank.toUpperCase()}</span>
@@ -680,24 +360,24 @@ export default function App() {
           <>
             <section className="board-pane">
               <Goban9x9
-                board={josekiState.board}
-                currentTurn={josekiState.turn}
-                lastMove={josekiState.lastMove}
-                hints={josekiState.nextMarkers}
+                board={dojo.josekiState.board}
+                currentTurn={dojo.josekiState.turn}
+                lastMove={dojo.josekiState.lastMove}
+                hints={dojo.josekiState.nextMarkers}
                 territoryMap={territoryOverlay}
                 chainLiberties={libertiesOverlay}
                 onHintClick={(marker) => {
                   clearCoaching();
-                  setJosekiPath((prev) => [...prev, marker.node]);
+                  dojo.setJosekiPath((prev) => [...prev, marker.node]);
                   setStatusBanner(`${marker.node.move} — ${marker.node.term}`);
                 }}
                 onIntersectionClick={(r, c) => {
-                  const found = josekiState.nextMarkers.find(
+                  const found = dojo.josekiState.nextMarkers.find(
                     (m) => m.row === r && m.col === c,
                   );
                   if (found) {
                     clearCoaching();
-                    setJosekiPath((prev) => [...prev, found.node]);
+                    dojo.setJosekiPath((prev) => [...prev, found.node]);
                     setStatusBanner(`${found.node.move} — ${found.node.term}`);
                   }
                 }}
@@ -710,28 +390,28 @@ export default function App() {
                 <div className="sensei-header">
                   <h2>Opening Sequence Path</h2>
                   <span className="model-tag">
-                    Move #{josekiPath.length} (
-                    {josekiState.turn === BLACK ? 'Black' : 'White'} Next)
+                    Move #{dojo.josekiPath.length} (
+                    {dojo.josekiState.turn === BLACK ? 'Black' : 'White'} Next)
                   </span>
                 </div>
 
                 <div className="drill-strip">
                   <button
-                    className={`drill-chip ${josekiPath.length === 0 ? 'active' : ''}`}
+                    className={`drill-chip ${dojo.josekiPath.length === 0 ? 'active' : ''}`}
                     onClick={() => {
                       clearCoaching();
-                      setJosekiPath([]);
+                      dojo.setJosekiPath([]);
                     }}
                   >
                     Root
                   </button>
-                  {josekiPath.map((node, idx) => (
+                  {dojo.josekiPath.map((node, idx) => (
                     <button
                       key={`${node.move}-${idx}`}
-                      className={`drill-chip ${idx === josekiPath.length - 1 ? 'active' : ''}`}
+                      className={`drill-chip ${idx === dojo.josekiPath.length - 1 ? 'active' : ''}`}
                       onClick={() => {
                         clearCoaching();
-                        setJosekiPath((prev) => prev.slice(0, idx + 1));
+                        dojo.setJosekiPath((prev) => prev.slice(0, idx + 1));
                       }}
                     >
                       {idx + 1}. {node.move}
@@ -743,9 +423,9 @@ export default function App() {
                   <button
                     onClick={() => {
                       clearCoaching();
-                      setJosekiPath((prev) => prev.slice(0, -1));
+                      dojo.setJosekiPath((prev) => prev.slice(0, -1));
                     }}
-                    disabled={josekiPath.length === 0}
+                    disabled={dojo.josekiPath.length === 0}
                   >
                     &lt; Step Back
                   </button>
@@ -753,9 +433,9 @@ export default function App() {
                     className="danger"
                     onClick={() => {
                       clearCoaching();
-                      setJosekiPath([]);
+                      dojo.setJosekiPath([]);
                     }}
-                    disabled={josekiPath.length === 0}
+                    disabled={dojo.josekiPath.length === 0}
                   >
                     Reset Tree
                   </button>
@@ -765,9 +445,9 @@ export default function App() {
               <div className="panel-card">
                 <div className="sensei-header">
                   <h2>
-                    {josekiState.currentNode.move
-                      ? `${josekiState.currentNode.move} — ${josekiState.currentNode.term}`
-                      : josekiState.currentNode.term}
+                    {dojo.josekiState.currentNode.move
+                      ? `${dojo.josekiState.currentNode.move} — ${dojo.josekiState.currentNode.term}`
+                      : dojo.josekiState.currentNode.term}
                   </h2>
                 </div>
                 <p
@@ -777,14 +457,14 @@ export default function App() {
                     lineHeight: 1.45,
                   }}
                 >
-                  {josekiState.currentNode.summary}
+                  {dojo.josekiState.currentNode.summary}
                 </p>
 
-                {josekiState.nextMarkers.length > 0 ? (
+                {dojo.josekiState.nextMarkers.length > 0 ? (
                   <>
                     <h2>
                       Next Continuations (
-                      {josekiState.turn === BLACK ? 'Black' : 'White'})
+                      {dojo.josekiState.turn === BLACK ? 'Black' : 'White'})
                     </h2>
                     <div
                       style={{
@@ -793,7 +473,7 @@ export default function App() {
                         gap: '6px',
                       }}
                     >
-                      {josekiState.nextMarkers.map((m) => (
+                      {dojo.josekiState.nextMarkers.map((m) => (
                         <button
                           key={m.move}
                           style={{
@@ -806,7 +486,7 @@ export default function App() {
                           }}
                           onClick={() => {
                             clearCoaching();
-                            setJosekiPath((prev) => [...prev, m.node]);
+                            dojo.setJosekiPath((prev) => [...prev, m.node]);
                             setStatusBanner(`${m.node.move} — ${m.node.term}`);
                           }}
                         >
@@ -839,52 +519,39 @@ export default function App() {
               <div className="panel-card sensei-card">
                 <div className="sensei-header">
                   <h2>Sensei Position Read</h2>
-                  <div className="model-toggle-group">
-                    <button
-                      type="button"
-                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:3b' ? 'active' : ''}`}
-                      onClick={() => setSenseiModel('qwen2.5-coder:3b')}
-                      disabled={senseiLoading}
-                    >
-                      3B Fast
-                    </button>
-                    <button
-                      type="button"
-                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:7b' ? 'active' : ''}`}
-                      onClick={() => setSenseiModel('qwen2.5-coder:7b')}
-                      disabled={senseiLoading}
-                    >
-                      7B Deep
-                    </button>
-                  </div>
+                  {renderModelToggles()}
                 </div>
 
                 <button
                   style={{ width: '100%' }}
                   onClick={() => {
-                    if (!josekiState.currentNode.move) return;
+                    if (!dojo.josekiState.currentNode.move) return;
                     const playedColor =
-                      josekiState.turn === BLACK ? WHITE : BLACK;
-                    requestHintExplanation(
-                      josekiState.board,
+                      dojo.josekiState.turn === BLACK ? WHITE : BLACK;
+                    coach.requestHintExplanation(
+                      dojo.josekiState.board,
                       playedColor,
-                      josekiState.currentNode.move,
+                      dojo.josekiState.currentNode.move,
                       [],
                       null,
                       'last_move',
                     );
                   }}
-                  disabled={!josekiState.currentNode.move || senseiLoading}
+                  disabled={
+                    !dojo.josekiState.currentNode.move || coach.senseiLoading
+                  }
                 >
                   Ask Sensei About This Shape
                 </button>
 
                 <div className="sensei-output mt-10">
-                  {senseiLoading ? (
+                  {coach.senseiLoading ? (
                     <p className="muted">Consulting Sensei via Ollama...</p>
-                  ) : explanationData ? (
+                  ) : coach.explanationData ? (
                     <div className="explain-body">
-                      {renderFormattedSenseiText(explanationData.explanation)}
+                      {renderFormattedSenseiText(
+                        coach.explanationData.explanation,
+                      )}
                     </div>
                   ) : (
                     <p className="muted">
@@ -901,16 +568,16 @@ export default function App() {
           <>
             <section className="board-pane">
               <Goban9x9
-                board={puzzleBoard}
-                currentTurn={currentPuzzle?.turn || BLACK}
-                lastMove={puzzleLastMove}
-                hints={hints}
-                selectedHintCoord={selectedHint?.move || null}
+                board={dojo.puzzleBoard}
+                currentTurn={dojo.currentPuzzle?.turn || BLACK}
+                lastMove={dojo.puzzleLastMove}
+                hints={coach.hints}
+                selectedHintCoord={coach.selectedHint?.move || null}
                 territoryMap={territoryOverlay}
                 chainLiberties={libertiesOverlay}
-                onIntersectionClick={handlePuzzleIntersectionClick}
-                onHintClick={handleHintClick}
-                disabled={puzzleSolved}
+                onIntersectionClick={dojo.handlePuzzleIntersectionClick}
+                onHintClick={coach.handleHintClick}
+                disabled={dojo.puzzleSolved}
               />
               {renderOverlayStrip()}
             </section>
@@ -921,10 +588,12 @@ export default function App() {
                 <label className="field-label">
                   Skill Module
                   <select
-                    value={activePackIdx}
-                    onChange={(e) => selectPuzzle(Number(e.target.value), 0)}
+                    value={dojo.activePackIdx}
+                    onChange={(e) =>
+                      dojo.selectPuzzle(Number(e.target.value), 0)
+                    }
                   >
-                    {puzzlePacks.map((pack, idx) => (
+                    {dojo.puzzlePacks.map((pack, idx) => (
                       <option key={pack.category} value={idx}>
                         {pack.title}
                       </option>
@@ -932,15 +601,19 @@ export default function App() {
                   </select>
                 </label>
 
-                {currentPack && (
+                {dojo.currentPack && (
                   <div className="drill-strip mt-10">
-                    {currentPack.puzzles.map((p, idx) => {
-                      const isDone = progressStats.solvedIds?.includes(p.id);
+                    {dojo.currentPack.puzzles.map((p, idx) => {
+                      const isDone = dojo.progressStats.solvedIds?.includes(
+                        p.id,
+                      );
                       return (
                         <button
                           key={p.id}
-                          className={`drill-chip ${activePuzzleIdx === idx ? 'active' : ''}`}
-                          onClick={() => selectPuzzle(activePackIdx, idx)}
+                          className={`drill-chip ${dojo.activePuzzleIdx === idx ? 'active' : ''}`}
+                          onClick={() =>
+                            dojo.selectPuzzle(dojo.activePackIdx, idx)
+                          }
                           title={`${p.title} (${p.rank.toUpperCase()})`}
                         >
                           #{idx + 1} {isDone ? '✓' : ''}
@@ -951,20 +624,21 @@ export default function App() {
                 )}
               </div>
 
-              {currentPuzzle && (
+              {dojo.currentPuzzle && (
                 <div className="panel-card">
                   <div className="sensei-header">
                     <h2>
-                      {currentPuzzle.title} ({currentPuzzle.rank.toUpperCase()})
+                      {dojo.currentPuzzle.title} (
+                      {dojo.currentPuzzle.rank.toUpperCase()})
                     </h2>
                     <span className="model-tag">
-                      {currentPuzzle.turn === BLACK
+                      {dojo.currentPuzzle.turn === BLACK
                         ? 'Black to Play'
                         : 'White to Play'}
                     </span>
                   </div>
 
-                  {currentPuzzle.concept && (
+                  {dojo.currentPuzzle.concept && (
                     <div
                       style={{
                         background: 'rgba(234, 179, 8, 0.08)',
@@ -977,40 +651,48 @@ export default function App() {
                         lineHeight: 1.4,
                       }}
                     >
-                      <strong>Sensei Principle:</strong> {currentPuzzle.concept}
+                      <strong>Sensei Principle:</strong>{' '}
+                      {dojo.currentPuzzle.concept}
                     </div>
                   )}
 
                   <p style={{ fontSize: '0.84rem', margin: '0 0 12px 0' }}>
-                    {currentPuzzle.prompt}
+                    {dojo.currentPuzzle.prompt}
                   </p>
 
-                  {puzzleFeedback && (
-                    <div className={`puzzle-feedback ${puzzleFeedback.status}`}>
+                  {dojo.puzzleFeedback && (
+                    <div
+                      className={`puzzle-feedback ${dojo.puzzleFeedback.status}`}
+                    >
                       <strong>
-                        {puzzleFeedback.status === 'solved'
+                        {dojo.puzzleFeedback.status === 'solved'
                           ? '✓ Solved'
-                          : puzzleFeedback.status === 'step'
+                          : dojo.puzzleFeedback.status === 'step'
                             ? '⚡ Step Clear'
                             : '✕ Retry'}
-                        ({puzzleFeedback.move}):{' '}
+                        ({dojo.puzzleFeedback.move}):{' '}
                       </strong>
-                      {puzzleFeedback.text}
+                      {dojo.puzzleFeedback.text}
                     </div>
                   )}
 
                   <div className="sym-grid-4 mt-10">
-                    <button onClick={() => stepPuzzle(-1)}>&lt; Prev</button>
+                    <button onClick={() => dojo.stepPuzzle(-1)}>
+                      &lt; Prev
+                    </button>
                     <button
                       onClick={() =>
-                        selectPuzzle(activePackIdx, activePuzzleIdx)
+                        dojo.selectPuzzle(
+                          dojo.activePackIdx,
+                          dojo.activePuzzleIdx,
+                        )
                       }
                     >
                       Retry
                     </button>
                     <button
-                      className={puzzleSolved ? 'active' : ''}
-                      onClick={() => stepPuzzle(1)}
+                      className={dojo.puzzleSolved ? 'active' : ''}
+                      onClick={() => dojo.stepPuzzle(1)}
                       style={{ gridColumn: 'span 2' }}
                     >
                       Next Drill &gt;
@@ -1022,54 +704,41 @@ export default function App() {
               <div className="panel-card sensei-card">
                 <div className="sensei-header">
                   <h2>Sensei Coaching</h2>
-                  <div className="model-toggle-group">
-                    <button
-                      type="button"
-                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:3b' ? 'active' : ''}`}
-                      onClick={() => setSenseiModel('qwen2.5-coder:3b')}
-                      disabled={senseiLoading}
-                      title="Fast ~2s tactical reads via qwen2.5-coder:3b"
-                    >
-                      3B Fast
-                    </button>
-                    <button
-                      type="button"
-                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:7b' ? 'active' : ''}`}
-                      onClick={() => setSenseiModel('qwen2.5-coder:7b')}
-                      disabled={senseiLoading}
-                      title="Deeper analysis via qwen2.5-coder:7b"
-                    >
-                      7B Deep
-                    </button>
-                  </div>
+                  {renderModelToggles()}
                 </div>
 
                 <div className="sym-grid-2">
                   <button
-                    className={hints.length > 0 ? 'active' : ''}
-                    onClick={handleRequestHints}
-                    disabled={puzzleSolved || hintsLoading}
+                    className={coach.hints.length > 0 ? 'active' : ''}
+                    onClick={coach.handleRequestHints}
+                    disabled={dojo.puzzleSolved || coach.hintsLoading}
                   >
-                    {hints.length > 0 ? 'Refresh Hints' : 'Ask Sensei (4)'}
+                    {coach.hints.length > 0
+                      ? 'Refresh Hints'
+                      : 'Ask Sensei (4)'}
                   </button>
                   <button
                     onClick={clearCoaching}
-                    disabled={hints.length === 0 && !explanationData}
+                    disabled={
+                      coach.hints.length === 0 && !coach.explanationData
+                    }
                   >
                     Clear Hints
                   </button>
                 </div>
 
                 <div className="sensei-output mt-10">
-                  {senseiLoading ? (
+                  {coach.senseiLoading ? (
                     <p className="muted">Consulting Sensei via Ollama...</p>
-                  ) : explanationData ? (
+                  ) : coach.explanationData ? (
                     <>
                       <div className="explain-meta">
-                        <strong>Focus: {explanationData.move}</strong>
+                        <strong>Focus: {coach.explanationData.move}</strong>
                       </div>
                       <div className="explain-body">
-                        {renderFormattedSenseiText(explanationData.explanation)}
+                        {renderFormattedSenseiText(
+                          coach.explanationData.explanation,
+                        )}
                       </div>
                     </>
                   ) : (
@@ -1086,19 +755,23 @@ export default function App() {
           <>
             <section className="board-pane">
               <Goban9x9
-                board={board}
-                currentTurn={currentTurn}
-                lastMove={lastMove && lastMove.row >= 0 ? lastMove : null}
-                lastBlackMove={lastBlackMove}
-                lastWhiteMove={lastWhiteMove}
-                koPoint={koPoint}
-                hints={hints}
-                selectedHintCoord={selectedHint?.move || null}
+                board={match.board}
+                currentTurn={match.currentTurn}
+                lastMove={
+                  match.lastMove && match.lastMove.row >= 0
+                    ? match.lastMove
+                    : null
+                }
+                lastBlackMove={match.lastBlackMove}
+                lastWhiteMove={match.lastWhiteMove}
+                koPoint={match.koPoint}
+                hints={coach.hints}
+                selectedHintCoord={coach.selectedHint?.move || null}
                 territoryMap={territoryOverlay}
                 chainLiberties={libertiesOverlay}
-                onIntersectionClick={handleIntersectionClick}
-                onHintClick={handleHintClick}
-                disabled={Boolean(gameResult) || aiThinking}
+                onIntersectionClick={match.handleIntersectionClick}
+                onHintClick={coach.handleHintClick}
+                disabled={Boolean(match.gameResult) || match.aiThinking}
               />
               {renderOverlayStrip()}
             </section>
@@ -1108,34 +781,38 @@ export default function App() {
                 <h2>Dojo Setup</h2>
                 <div className="sym-grid-2">
                   <button
-                    className={vsAi ? 'active' : ''}
-                    onClick={() => startFreshMatch({ nextVsAi: true })}
-                    disabled={aiThinking}
+                    className={match.vsAi ? 'active' : ''}
+                    onClick={() => match.startFreshMatch({ nextVsAi: true })}
+                    disabled={match.aiThinking}
                   >
                     AI Sensei
                   </button>
                   <button
-                    className={!vsAi ? 'active' : ''}
-                    onClick={() => startFreshMatch({ nextVsAi: false })}
-                    disabled={aiThinking}
+                    className={!match.vsAi ? 'active' : ''}
+                    onClick={() => match.startFreshMatch({ nextVsAi: false })}
+                    disabled={match.aiThinking}
                   >
                     Local 2P
                   </button>
                 </div>
 
-                {vsAi && (
+                {match.vsAi && (
                   <div className="sym-grid-2 mt-10">
                     <button
-                      className={humanColor === BLACK ? 'active' : ''}
-                      onClick={() => startFreshMatch({ nextHumanColor: BLACK })}
-                      disabled={aiThinking}
+                      className={match.humanColor === BLACK ? 'active' : ''}
+                      onClick={() =>
+                        match.startFreshMatch({ nextHumanColor: BLACK })
+                      }
+                      disabled={match.aiThinking}
                     >
                       Play Black
                     </button>
                     <button
-                      className={humanColor === WHITE ? 'active' : ''}
-                      onClick={() => startFreshMatch({ nextHumanColor: WHITE })}
-                      disabled={aiThinking}
+                      className={match.humanColor === WHITE ? 'active' : ''}
+                      onClick={() =>
+                        match.startFreshMatch({ nextHumanColor: WHITE })
+                      }
+                      disabled={match.aiThinking}
                     >
                       Play White
                     </button>
@@ -1143,13 +820,13 @@ export default function App() {
                 )}
 
                 <div className="sym-grid-2 mt-10">
-                  {vsAi && (
+                  {match.vsAi && (
                     <label className="field-label">
                       Sensei Rank
                       <select
                         value={aiRank}
                         onChange={(e) => setAiRank(e.target.value)}
-                        disabled={aiThinking}
+                        disabled={match.aiThinking}
                       >
                         {RANK_OPTIONS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
@@ -1162,15 +839,17 @@ export default function App() {
 
                   <label
                     className="field-label"
-                    style={!vsAi ? { gridColumn: '1 / -1' } : undefined}
+                    style={!match.vsAi ? { gridColumn: '1 / -1' } : undefined}
                   >
                     Komi / Handicap
                     <select
-                      value={handicapId}
+                      value={match.handicapId}
                       onChange={(e) =>
-                        startFreshMatch({ nextHandicapId: e.target.value })
+                        match.startFreshMatch({
+                          nextHandicapId: e.target.value,
+                        })
                       }
-                      disabled={aiThinking}
+                      disabled={match.aiThinking}
                     >
                       {HANDICAP_OPTIONS.map((opt) => (
                         <option key={opt.id} value={opt.id}>
@@ -1186,56 +865,58 @@ export default function App() {
                 <h2>Match Telemetry</h2>
                 <div className="turn-row">
                   <span
-                    className={`stone-indicator ${currentTurn === BLACK ? 'black' : 'white'}`}
+                    className={`stone-indicator ${match.currentTurn === BLACK ? 'black' : 'white'}`}
                   />
                   <strong>
-                    {gameResult
+                    {match.gameResult
                       ? 'Match Complete'
-                      : aiThinking
+                      : match.aiThinking
                         ? 'Sensei Reading...'
-                        : `${currentTurn === BLACK ? 'Black' : 'White'}'s Turn`}
+                        : `${match.currentTurn === BLACK ? 'Black' : 'White'}'s Turn`}
                   </strong>
                   <span className="move-count">
-                    Move #{moveHistory.length + 1}
+                    Move #{match.moveHistory.length + 1}
                   </span>
                 </div>
 
                 <div className="sym-grid-2">
                   <div className="capture-box">
                     <span className="label">Black Captures</span>
-                    <span className="value">{captures[BLACK]}</span>
+                    <span className="value">{match.captures[BLACK]}</span>
                   </div>
                   <div className="capture-box">
                     <span className="label">White Captures</span>
-                    <span className="value">{captures[WHITE]}</span>
+                    <span className="value">{match.captures[WHITE]}</span>
                   </div>
                 </div>
 
                 <div className="sym-grid-4 mt-10">
                   <button
-                    onClick={handleUndo}
-                    disabled={moveHistory.length === 0 || aiThinking}
+                    onClick={match.handleUndo}
+                    disabled={
+                      match.moveHistory.length === 0 || match.aiThinking
+                    }
                     title="Undo"
                   >
                     &lt; Undo
                   </button>
                   <button
-                    onClick={handleRedo}
-                    disabled={redoStack.length === 0 || aiThinking}
+                    onClick={match.handleRedo}
+                    disabled={match.redoStack.length === 0 || match.aiThinking}
                     title="Redo"
                   >
                     Redo &gt;
                   </button>
                   <button
-                    onClick={handlePass}
-                    disabled={Boolean(gameResult) || aiThinking}
+                    onClick={match.handlePass}
+                    disabled={Boolean(match.gameResult) || match.aiThinking}
                   >
                     Pass
                   </button>
                   <button
                     className="danger"
-                    onClick={() => startFreshMatch()}
-                    disabled={aiThinking}
+                    onClick={() => match.startFreshMatch()}
+                    disabled={match.aiThinking}
                   >
                     Reset
                   </button>
@@ -1245,58 +926,45 @@ export default function App() {
               <div className="panel-card sensei-card">
                 <div className="sensei-header">
                   <h2>Sensei Coaching</h2>
-                  <div className="model-toggle-group">
-                    <button
-                      type="button"
-                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:3b' ? 'active' : ''}`}
-                      onClick={() => setSenseiModel('qwen2.5-coder:3b')}
-                      disabled={senseiLoading}
-                      title="Fast ~2s tactical reads via qwen2.5-coder:3b"
-                    >
-                      3B Fast
-                    </button>
-                    <button
-                      type="button"
-                      className={`mini-toggle ${senseiModel === 'qwen2.5-coder:7b' ? 'active' : ''}`}
-                      onClick={() => setSenseiModel('qwen2.5-coder:7b')}
-                      disabled={senseiLoading}
-                      title="Deeper analysis via qwen2.5-coder:7b"
-                    >
-                      7B Deep
-                    </button>
-                  </div>
+                  {renderModelToggles()}
                 </div>
 
                 <div className="sym-grid-2">
                   <button
-                    className={hints.length > 0 ? 'active' : ''}
-                    onClick={handleRequestHints}
-                    disabled={Boolean(gameResult) || aiThinking || hintsLoading}
+                    className={coach.hints.length > 0 ? 'active' : ''}
+                    onClick={coach.handleRequestHints}
+                    disabled={
+                      Boolean(match.gameResult) ||
+                      match.aiThinking ||
+                      coach.hintsLoading
+                    }
                   >
-                    {hints.length > 0 ? 'Refresh Hints' : 'Ask Sensei (4)'}
+                    {coach.hints.length > 0
+                      ? 'Refresh Hints'
+                      : 'Ask Sensei (4)'}
                   </button>
                   <button
-                    onClick={handleExplainLastMove}
+                    onClick={coach.handleExplainLastMove}
                     disabled={
-                      !lastMove ||
-                      lastMove.row < 0 ||
-                      aiThinking ||
-                      senseiLoading
+                      !match.lastMove ||
+                      match.lastMove.row < 0 ||
+                      match.aiThinking ||
+                      coach.senseiLoading
                     }
                   >
                     Explain Last
                   </button>
                 </div>
 
-                {hints.length > 0 && (
+                {coach.hints.length > 0 && (
                   <div className="sym-grid-4 mt-10">
-                    {hints.map((h) => (
+                    {coach.hints.map((h) => (
                       <button
                         key={h.move}
                         className={
-                          selectedHint?.move === h.move ? 'active' : ''
+                          coach.selectedHint?.move === h.move ? 'active' : ''
                         }
-                        onClick={() => handleHintClick(h)}
+                        onClick={() => coach.handleHintClick(h)}
                         title={`Winrate ${h.winrate}% (${h.scoreLead >= 0 ? '+' : ''}${h.scoreLead})`}
                       >
                         #{h.rank} {h.move}
@@ -1306,38 +974,43 @@ export default function App() {
                 )}
 
                 <div className="sensei-output mt-10">
-                  {senseiLoading ? (
+                  {coach.senseiLoading ? (
                     <p className="muted">
                       Consulting {aiRank.toUpperCase()} Sensei via Ollama...
                     </p>
-                  ) : explanationData ? (
+                  ) : coach.explanationData ? (
                     <>
                       <div className="explain-meta">
-                        <strong>Focus: {explanationData.move}</strong>
-                        {selectedHint && (
+                        <strong>Focus: {coach.explanationData.move}</strong>
+                        {coach.selectedHint && (
                           <span>
-                            Win {selectedHint.winrate}% (
-                            {selectedHint.scoreLead >= 0 ? '+' : ''}
-                            {selectedHint.scoreLead})
+                            Win {coach.selectedHint.winrate}% (
+                            {coach.selectedHint.scoreLead >= 0 ? '+' : ''}
+                            {coach.selectedHint.scoreLead})
                           </span>
                         )}
                       </div>
                       <div className="explain-body">
-                        {renderFormattedSenseiText(explanationData.explanation)}
+                        {renderFormattedSenseiText(
+                          coach.explanationData.explanation,
+                        )}
                       </div>
-                      {selectedHint && (
+                      {coach.selectedHint && (
                         <button
                           className="active mt-10"
                           style={{ width: '100%' }}
                           onClick={() =>
-                            handleIntersectionClick(
-                              selectedHint.row,
-                              selectedHint.col,
+                            match.handleIntersectionClick(
+                              coach.selectedHint.row,
+                              coach.selectedHint.col,
                             )
                           }
-                          disabled={Boolean(gameResult) || aiThinking}
+                          disabled={
+                            Boolean(match.gameResult) || match.aiThinking
+                          }
                         >
-                          Play Hint #{selectedHint.rank} ({selectedHint.move})
+                          Play Hint #{coach.selectedHint.rank} (
+                          {coach.selectedHint.move})
                         </button>
                       )}
                     </>
@@ -1353,23 +1026,27 @@ export default function App() {
 
               <div className="panel-card history-card">
                 <h2>Move Log</h2>
-                {sgfMeta && (
+                {match.sgfMeta && (
                   <div className="explain-meta" style={{ marginBottom: '8px' }}>
                     <span>
-                      <strong>B:</strong> {sgfMeta.blackName}{' '}
-                      {sgfMeta.blackRank && `[${sgfMeta.blackRank}]`} •{' '}
-                      <strong>W:</strong> {sgfMeta.whiteName}{' '}
-                      {sgfMeta.whiteRank && `[${sgfMeta.whiteRank}]`}
+                      <strong>B:</strong> {match.sgfMeta.blackName}{' '}
+                      {match.sgfMeta.blackRank &&
+                        `[${match.sgfMeta.blackRank}]`}{' '}
+                      • <strong>W:</strong> {match.sgfMeta.whiteName}{' '}
+                      {match.sgfMeta.whiteRank &&
+                        `[${match.sgfMeta.whiteRank}]`}
                     </span>
-                    {sgfMeta.result && <strong>{sgfMeta.result}</strong>}
+                    {match.sgfMeta.result && (
+                      <strong>{match.sgfMeta.result}</strong>
+                    )}
                   </div>
                 )}
                 <div className="move-log">
-                  {moveHistory.length === 0 ? (
+                  {match.moveHistory.length === 0 ? (
                     <p className="muted">No stones played yet.</p>
                   ) : (
-                    [...moveHistory].reverse().map((m, revIdx) => {
-                      const moveNum = moveHistory.length - revIdx;
+                    [...match.moveHistory].reverse().map((m, revIdx) => {
+                      const moveNum = match.moveHistory.length - revIdx;
                       return (
                         <div
                           key={moveNum}
