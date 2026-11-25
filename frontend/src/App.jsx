@@ -1,3 +1,4 @@
+// frontend\src\App.jsx
 import { useState, useEffect, useCallback } from 'react';
 import Goban9x9 from './components/Goban9x9';
 import {
@@ -11,7 +12,7 @@ import {
   computeTerritoryMap,
   computeChainLiberties,
   exportToSgf,
-  parseSgfMoves,
+  parseSgf,
 } from './utils/goLogic';
 import './App.css';
 
@@ -70,6 +71,7 @@ export default function App() {
     'Black to play. Click an intersection to place a stone.',
   );
   const [gameResult, setGameResult] = useState(null);
+  const [sgfMeta, setSgfMeta] = useState(null);
 
   // AI Sensei Opponent Controls
   const [vsAi, setVsAi] = useState(true);
@@ -370,6 +372,7 @@ export default function App() {
       const freshCaptures = { [BLACK]: 0, [WHITE]: 0 };
 
       clearCoaching();
+      setSgfMeta(null);
       setVsAi(nextVsAi);
       setHumanColor(nextHumanColor);
       setHandicapId(nextHandicapId);
@@ -565,10 +568,34 @@ export default function App() {
   };
 
   const handleExportSgf = () => {
+    const userLabel = 'Colby Cardell';
+    const userRank = progressStats.estimatedRank;
+    const botLabel = `AI Sensei (${aiRank.toUpperCase()})`;
+    const resultTag = gameResult
+      ? `${gameResult.winner === 'Black' ? 'B' : 'W'}+${gameResult.margin}`
+      : '';
+
+    const meta = sgfMeta || {
+      blackName: vsAi
+        ? humanColor === BLACK
+          ? userLabel
+          : botLabel
+        : 'Player 1 (Black)',
+      whiteName: vsAi
+        ? humanColor === WHITE
+          ? userLabel
+          : botLabel
+        : 'Player 2 (White)',
+      blackRank: vsAi ? (humanColor === BLACK ? userRank : aiRank) : '',
+      whiteRank: vsAi ? (humanColor === WHITE ? userRank : aiRank) : '',
+      result: resultTag,
+    };
+
     const sgf = exportToSgf(
       moveHistory,
       activeHandicap.komi,
       activeHandicap.stones,
+      meta,
     );
     const blob = new Blob([sgf], { type: 'application/x-go-sgf' });
     const url = URL.createObjectURL(blob);
@@ -585,13 +612,13 @@ export default function App() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const parsed = parseSgfMoves(String(reader.result || ''));
+      const { moves: parsed, meta } = parseSgf(String(reader.result || ''));
       if (parsed.length === 0) {
         setStatusBanner('No valid 9x9 moves found in SGF file.');
         return;
       }
-      let simBoard = createInitialBoard(0);
-      let simTurn = BLACK;
+      let simBoard = createInitialBoard(meta.handicap || 0);
+      let simTurn = (meta.handicap || 0) >= 2 ? WHITE : BLACK;
       let simKo = null;
       const simCaps = { [BLACK]: 0, [WHITE]: 0 };
       const rebuiltHistory = [];
@@ -647,8 +674,13 @@ export default function App() {
         }
       }
 
+      const bHeader = `${meta.blackName}${meta.blackRank ? ` (${meta.blackRank})` : ''}`;
+      const wHeader = `${meta.whiteName}${meta.whiteRank ? ` (${meta.whiteRank})` : ''}`;
+      const resNote = meta.result ? ` • Result: ${meta.result}` : '';
+
       clearCoaching();
       setVsAi(false);
+      setSgfMeta(meta);
       setBoard(simBoard);
       setCurrentTurn(simTurn);
       setCaptures(simCaps);
@@ -658,7 +690,7 @@ export default function App() {
       setGameResult(null);
       setActiveTab('match');
       setStatusBanner(
-        `Loaded ${rebuiltHistory.length} moves from ${file.name} (Local 2P / Sensei Review mode).`,
+        `Loaded ${file.name}: ${bHeader} vs ${wHeader}${resNote} (${rebuiltHistory.length} moves).`,
       );
     };
     reader.readAsText(file);
@@ -1792,6 +1824,17 @@ export default function App() {
 
               <div className="panel-card history-card">
                 <h2>Move Log</h2>
+                {sgfMeta && (
+                  <div className="explain-meta" style={{ marginBottom: '8px' }}>
+                    <span>
+                      <strong>B:</strong> {sgfMeta.blackName}{' '}
+                      {sgfMeta.blackRank && `[${sgfMeta.blackRank}]`} •{' '}
+                      <strong>W:</strong> {sgfMeta.whiteName}{' '}
+                      {sgfMeta.whiteRank && `[${sgfMeta.whiteRank}]`}
+                    </span>
+                    {sgfMeta.result && <strong>{sgfMeta.result}</strong>}
+                  </div>
+                )}
                 <div className="move-log">
                   {moveHistory.length === 0 ? (
                     <p className="muted">No stones played yet.</p>

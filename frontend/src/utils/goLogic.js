@@ -320,23 +320,80 @@ export function computeChainLiberties(board) {
 
 const SGF_ALPHA = 'abcdefghi';
 
+function escapeSgfText(val) {
+  return String(val ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\]/g, '\\]');
+}
+
+function formatKyuTag(rankStr) {
+  if (!rankStr) return '';
+  const match = String(rankStr)
+    .trim()
+    .match(/^(\d+(?:\.\d+)?)\s*(k|kyu|d|dan)/i);
+  if (!match) return String(rankStr).trim();
+  const num = Math.max(1, Math.round(parseFloat(match[1])));
+  const unit = match[2].toLowerCase().startsWith('d') ? 'd' : 'k';
+  return `${num}${unit}`;
+}
+
 /**
- * Serializes current match history into standard 9x9 Smart Game Format (.sgf).
+ * Serializes current match history + player/rank/result metadata into standard 9x9 SGF.
  */
-export function exportToSgf(moveHistory, komi = 6.5, handicapStones = 0) {
-  const header = `(;FF[4]GM[1]SZ[9]KM[${komi}]HA[${handicapStones}]AP[AI-Sensei-9x9]`;
+export function exportToSgf(
+  moveHistory,
+  komi = 6.5,
+  handicapStones = 0,
+  meta = {},
+) {
+  const dateStr = meta.date || new Date().toISOString().slice(0, 10);
+  const tags = [
+    'FF[4]',
+    'GM[1]',
+    'SZ[9]',
+    `KM[${komi}]`,
+    `HA[${handicapStones}]`,
+    'AP[AI-Sensei-9x9]',
+    `DT[${dateStr}]`,
+  ];
+
+  if (meta.blackName) tags.push(`PB[${escapeSgfText(meta.blackName)}]`);
+  if (meta.whiteName) tags.push(`PW[${escapeSgfText(meta.whiteName)}]`);
+  if (meta.blackRank)
+    tags.push(`BR[${escapeSgfText(formatKyuTag(meta.blackRank))}]`);
+  if (meta.whiteRank)
+    tags.push(`WR[${escapeSgfText(formatKyuTag(meta.whiteRank))}]`);
+  if (meta.result) tags.push(`RE[${escapeSgfText(meta.result)}]`);
+
   const nodes = moveHistory.map((m) => {
     const tag = m.color === BLACK ? 'B' : 'W';
     if (m.row < 0 || m.col < 0) return `;${tag}[]`;
     return `;${tag}[${SGF_ALPHA[m.col]}${SGF_ALPHA[m.row]}]`;
   });
-  return `${header}${nodes.join('')})`;
+
+  return `(;${tags.join('')}${nodes.join('')})`;
 }
 
 /**
- * Parses a 9x9 SGF string into an array of { color, row, col, coord } moves.
+ * Parses a 9x9 SGF string into { moves, meta } with header tags destructured.
  */
-export function parseSgfMoves(sgfText) {
+export function parseSgf(sgfText) {
+  const extractTag = (tag) => {
+    const m = sgfText.match(new RegExp(`${tag}\\[((?:\\\\.|[^\\]])*)\\]`));
+    return m ? m[1].replace(/\\([\]\\])/g, '$1').trim() : null;
+  };
+
+  const meta = {
+    blackName: extractTag('PB') || 'Black',
+    whiteName: extractTag('PW') || 'White',
+    blackRank: extractTag('BR') || '',
+    whiteRank: extractTag('WR') || '',
+    result: extractTag('RE') || '',
+    date: extractTag('DT') || '',
+    komi: extractTag('KM') ? parseFloat(extractTag('KM')) : 6.5,
+    handicap: extractTag('HA') ? parseInt(extractTag('HA'), 10) : 0,
+  };
+
   const moves = [];
   const tokenRegex = /;([BW])\[([a-i]{0,2})\]/gi;
   let match;
@@ -353,5 +410,11 @@ export function parseSgfMoves(sgfText) {
       moves.push({ color, row: -1, col: -1, coord: 'PASS' });
     }
   }
-  return moves;
+
+  return { moves, meta };
+}
+
+// Backward-compatible alias
+export function parseSgfMoves(sgfText) {
+  return parseSgf(sgfText).moves;
 }
