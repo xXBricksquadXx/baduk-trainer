@@ -317,19 +317,21 @@ button.active {
 }
 
 .log-entry.latest {
-  border-left: 3px solid var(--accent);
-  border-top: 1px solid rgba(234, 179, 8, 0.28);
-  border-right: 1px solid rgba(234, 179, 8, 0.15);
-  border-bottom: 1px solid rgba(234, 179, 8, 0.15);
-  background: linear-gradient(
-    90deg,
-    rgba(234, 179, 8, 0.16) 0%,
-    rgba(30, 36, 48, 0.82) 50%,
-    rgba(234, 179, 8, 0.1) 100%
-  );
-  background-size: 200% auto;
+  border-style: solid;
+  border-width: 1px 1px 1px 3px;
+  border-color: transparent;
+  background:
+    linear-gradient(#181c24, #141820) padding-box,
+    conic-gradient(
+      from var(--glint-angle),
+      rgba(234, 179, 8, 0.25) 0deg,
+      rgba(234, 179, 8, 0.35) 260deg,
+      #fef08a 315deg,
+      #eab308 345deg,
+      rgba(234, 179, 8, 0.25) 360deg
+    ) border-box;
   color: var(--text);
-  animation: glintShine 3.6s linear infinite;
+  animation: borderOrbit 2.4s linear infinite;
 }
 
 @keyframes borderOrbit {
