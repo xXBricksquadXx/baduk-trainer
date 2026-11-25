@@ -96,7 +96,7 @@
         {
           "move": "F6",
           "reply": null,
-          "feedback": "Sharp eye! Even though F5 is also empty, wait—let's check: F6 and F5 are two liberties unless one is blocked. Plugging F6 puts the entire 3-stone chain in immediate Atari toward the edge!"
+          "feedback": "Sharp eye! F6 cuts off the upper breathing space of White's 3-stone chain, reducing the entire group to 1 liberty at F5."
         },
         {
           "move": "F5",

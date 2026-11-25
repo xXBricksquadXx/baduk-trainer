@@ -198,6 +198,38 @@
       "wrongHints": {
         "default": "Play D2 right next to E2 to connect C3 and D3 underneath—leaving D2 open lets White push into D2 and cut your lower-left apart!"
       }
+    },
+    {
+      "id": "shape-09",
+      "title": "2-Step Edge Under-Cut & Connect",
+      "rank": "14k",
+      "concept": "When an opponent pushes down the 3rd line (C3, C4) against your central wall (D3, D4, E5), sliding underneath on the 2nd line (B2) steals their base and connects your border.",
+      "prompt": "Black holds D3, D4, and E5 while White presses down the left side at C4 and C3. Slide underneath to deny White's bottom-left territory!",
+      "turn": 1,
+      "stones": [
+        { "coord": "D3", "color": 1 },
+        { "coord": "D4", "color": 1 },
+        { "coord": "E5", "color": 1 },
+        { "coord": "F3", "color": 1 },
+        { "coord": "C4", "color": 2 },
+        { "coord": "C3", "color": 2 },
+        { "coord": "B4", "color": 2 }
+      ],
+      "steps": [
+        {
+          "move": "B2",
+          "reply": "C2",
+          "feedback": "Step 1 complete! B2 slips underneath White's C3 stone—White blocks at C2 to cut you off. Now link back up cleanly!"
+        },
+        {
+          "move": "D2",
+          "reply": null,
+          "feedback": "Step 2 complete! D2 connects with D3 and threatens to capture C2, sealing the entire bottom edge."
+        }
+      ],
+      "wrongHints": {
+        "default": "Jump underneath White's 3rd-line stones at B2 first, then connect back to your central wall at D2 after White blocks at C2."
+      }
     }
   ]
 }

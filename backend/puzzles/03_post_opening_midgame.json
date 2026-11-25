@@ -212,6 +212,38 @@
       "wrongHints": {
         "default": "Look at the open 2nd-line gap at G2 between F3 and H3—if White plays G2, your entire F3-H4 group loses its base and gets captured!"
       }
+    },
+    {
+      "id": "mid-08",
+      "title": "2-Step Crosscut Counter-Attack",
+      "rank": "15k",
+      "concept": "When an opponent wedges into your central framework (F6, D6) while you hold E5 and E6, extend solidly to split their cutting stones rather than retreating.",
+      "prompt": "Black holds E5, E6, and G5 while White wedges at F6 and D6. Extend to keep your center unified and split White's top stones!",
+      "turn": 1,
+      "stones": [
+        { "coord": "E5", "color": 1 },
+        { "coord": "E6", "color": 1 },
+        { "coord": "G5", "color": 1 },
+        { "coord": "D5", "color": 1 },
+        { "coord": "F6", "color": 2 },
+        { "coord": "D6", "color": 2 },
+        { "coord": "F5", "color": 2 }
+      ],
+      "steps": [
+        {
+          "move": "F4",
+          "reply": "G4",
+          "feedback": "Step 1 complete! F4 puts White's F5 stone in Atari—White pushes down to G4 trying to escape. Now seal the cut!"
+        },
+        {
+          "move": "H4",
+          "reply": null,
+          "feedback": "Step 2 complete! H4 locks down the right side, leaving White's F5-G4 stones trapped with zero base."
+        }
+      ],
+      "wrongHints": {
+        "default": "White's F5 cutting stone only has 2 liberties—Atari from underneath at F4 first, then block at H4 when White extends to G4."
+      }
     }
   ]
 }

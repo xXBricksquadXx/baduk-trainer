@@ -83,15 +83,28 @@ def init_db() -> None:
             )
 
 
+def _get_verified_floor(conn: sqlite3.Connection) -> float | None:
+    """Returns the lowest (strongest) numeric rank defeated at least twice."""
+    rows = conn.execute("""
+        SELECT opponent_rank, COUNT(*) AS wins
+        FROM match_history
+        WHERE LOWER(winner) = LOWER(human_color)
+        GROUP BY LOWER(opponent_rank)
+        HAVING wins >= 2
+        """).fetchall()
+    if not rows:
+        return None
+    return min(_parse_rank_to_numeric(r["opponent_rank"]) for r in rows)
+
+
 def _compute_match_delta(
     curr_rank: float, opp_num: float, won: bool, margin: float
 ) -> float:
     """
-    Honest Elo-style rank delta:
-    - Gap > 0: opponent is stronger than player.
+    AGA/Glicko-inspired rank delta:
+    - Gap > 0: opponent is stronger than player (volatility scales up on upsets).
     - Gap < 0: opponent is weaker than player.
     - Zero rating gain if beating an opponent > 3.0 Kyu weaker than current rating.
-    - Symmetric 50/50 expectation against equal opponents (no free inflation).
     """
     gap = curr_rank - opp_num
 
@@ -103,9 +116,10 @@ def _compute_match_delta(
     expected_win = 1.0 / (1.0 + (10.0 ** (-gap / 6.0)))
     actual_score = 1.0 if won else 0.0
 
-    # K-factor: 0.85 base + small margin modifier up to +0.20 for decisive wins
-    margin_mod = min(0.20, max(0.0, margin) / 100.0) if won else 0.0
-    k_factor = 0.85 + margin_mod
+    # Dynamic K-factor: scales up when defeating stronger opponents so breakthroughs converge fast
+    upset_boost = max(0.0, gap) * 0.22 if won else 0.0
+    margin_mod = min(0.25, max(0.0, margin) / 80.0) if won else 0.0
+    k_factor = min(2.65, 0.90 + upset_boost + margin_mod)
 
     # Negative delta improves Kyu (moves closer to 1.0k / Dan)
     delta = -k_factor * (actual_score - expected_win)
@@ -183,9 +197,6 @@ def record_match_result(
         next_rank = max(-8.0, min(30.0, round(curr_rank + delta, 2)))
 
         conn.execute(
-            "UPDATE player_profile SET numeric_rank = ? WHERE id = 1", (next_rank,)
-        )
-        conn.execute(
             """
             INSERT INTO match_history (opponent_rank, human_color, winner, margin, moves_count, rank_delta)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -193,11 +204,20 @@ def record_match_result(
             (opponent_rank, human_color, winner, margin, moves_count, delta),
         )
 
+        # Pull rating up to within 2.0 stones of proven peer floor (defeated >= 2x)
+        verified_floor = _get_verified_floor(conn)
+        if verified_floor is not None and next_rank > verified_floor + 2.0:
+            next_rank = round(verified_floor + 2.0, 2)
+
+        conn.execute(
+            "UPDATE player_profile SET numeric_rank = ? WHERE id = 1", (next_rank,)
+        )
+
     return get_progress_summary()
 
 
 def recalculate_honest_rank() -> Dict[str, Any]:
-    """Replays existing puzzles + match_history from 30.0k under the strict symmetric rubric."""
+    """Replays existing puzzles + match_history from 30.0k under the weighted AGA/Elo rubric."""
     init_db()
     with get_conn() as conn:
         puzzles = conn.execute(
@@ -214,11 +234,21 @@ def recalculate_honest_rank() -> Dict[str, Any]:
         matches = conn.execute(
             "SELECT id, opponent_rank, human_color, winner, margin FROM match_history ORDER BY id ASC"
         ).fetchall()
+        wins_by_opp: Dict[float, int] = {}
         for m in matches:
             opp_num = _parse_rank_to_numeric(m["opponent_rank"])
             won = m["winner"].strip().lower() == m["human_color"].strip().lower()
             delta = _compute_match_delta(rank, opp_num, won, float(m["margin"]))
             rank = max(-8.0, min(30.0, round(rank + delta, 2)))
+
+            if won:
+                wins_by_opp[opp_num] = wins_by_opp.get(opp_num, 0) + 1
+                verified_ranks = [r for r, cnt in wins_by_opp.items() if cnt >= 2]
+                if verified_ranks:
+                    floor = min(verified_ranks)
+                    if rank > floor + 2.0:
+                        rank = round(floor + 2.0, 2)
+
             conn.execute(
                 "UPDATE match_history SET rank_delta = ? WHERE id = ?",
                 (delta, m["id"]),

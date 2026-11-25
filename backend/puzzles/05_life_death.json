@@ -198,6 +198,46 @@
       "wrongHints": {
         "default": "Throw in on the right edge at J2 first to shrink White's pocket, then finish at J1."
       }
+    },
+    {
+      "id": "life-07",
+      "title": "3-Step Corner Eye-Space Collapse",
+      "rank": "13k",
+      "concept": "A corner group flanked on the outside with an open 1st-line entry (C9) has fewer liberties than it looks—dive into the edge first to shrink its pocket before striking the vital point.",
+      "prompt": "White's upper-left corner (B8, C8, B7, A6) looks walled off, but your D8-D7-C6-B6 stones surround it from the outside. Collapse White's corner in 3 moves!",
+      "turn": 1,
+      "stones": [
+        { "coord": "B8", "color": 2 },
+        { "coord": "C8", "color": 2 },
+        { "coord": "B7", "color": 2 },
+        { "coord": "A6", "color": 2 },
+        { "coord": "D8", "color": 1 },
+        { "coord": "D7", "color": 1 },
+        { "coord": "C7", "color": 1 },
+        { "coord": "C6", "color": 1 },
+        { "coord": "B6", "color": 1 },
+        { "coord": "A5", "color": 1 }
+      ],
+      "steps": [
+        {
+          "move": "C9",
+          "reply": "B9",
+          "feedback": "Step 1 complete! C9 takes away White's top-edge extension—White blocks at B9. Now strike the corner vital point!"
+        },
+        {
+          "move": "A8",
+          "reply": "A7",
+          "feedback": "Step 2 complete! A8 splits White's pocket and puts A6 in Atari—White connects at A7. Now finish the capture!"
+        },
+        {
+          "move": "A9",
+          "reply": null,
+          "feedback": "Step 3 complete! A9 reduces the entire corner group to 1 eye and 1 liberty—White cannot make two eyes."
+        }
+      ],
+      "wrongHints": {
+        "default": "Start on the top 1st line at C9 to remove White's outer base, then strike A8 and finish at A9."
+      }
     }
   ]
 }

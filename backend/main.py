@@ -1,4 +1,5 @@
 import json
+from metrics_db import recalculate_honest_rank
 from sensei_agent import explain_move_with_sensei
 from typing import List, Optional, Tuple
 from fastapi import FastAPI, HTTPException
@@ -321,3 +322,8 @@ def save_match_metric(req: MatchRecordRequest):
         moves_count=req.movesCount,
     )
     return {"progress": progress}
+
+
+@app.post("/api/metrics/recalculate")
+def recalc_metrics():
+    return {"progress": recalculate_honest_rank()}

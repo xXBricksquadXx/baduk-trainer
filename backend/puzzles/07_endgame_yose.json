@@ -241,6 +241,45 @@
         "B8": "A9-B9 is already dead—don't spend a stone inside your own territory! Seal the open border at E3.",
         "default": "Leave the dead White stones in the top-left alone and play the last open boundary point at E3."
       }
+    },
+    {
+      "id": "yose-08",
+      "title": "2-Step Sente Squeeze Over Dead-Stone Bait",
+      "rank": "12k",
+      "concept": "When an enemy stone inside your territory (B8) has zero eye potential and your surrounding wall has 5+ liberties, ignore it and play the largest open Sente boundary push instead.",
+      "prompt": "White just threw a dead stone at B8 inside your sealed upper-left territory (A7, B7, C7, C8, C9), while the bottom-right boundary (F2-F3 vs G3-H3) is still open. Ignore the bait and squeeze the bottom border!",
+      "turn": 1,
+      "stones": [
+        { "coord": "B8", "color": 2 },
+        { "coord": "A7", "color": 1 },
+        { "coord": "B7", "color": 1 },
+        { "coord": "C7", "color": 1 },
+        { "coord": "C8", "color": 1 },
+        { "coord": "C9", "color": 1 },
+        { "coord": "F4", "color": 1 },
+        { "coord": "F3", "color": 1 },
+        { "coord": "F2", "color": 1 },
+        { "coord": "G4", "color": 2 },
+        { "coord": "G3", "color": 2 },
+        { "coord": "H3", "color": 2 }
+      ],
+      "steps": [
+        {
+          "move": "G2",
+          "reply": "G1",
+          "feedback": "Step 1 complete! Ignoring B8 to push at G2 forces White to block at G1 in Sente. Now seal your 1st-line gate!"
+        },
+        {
+          "move": "F1",
+          "reply": null,
+          "feedback": "Step 2 complete! F1 locks down your bottom border cleanly while B8 remains dead without costing you a single point."
+        }
+      ],
+      "wrongHints": {
+        "A8": "B8 cannot make two eyes and your wall has plenty of liberties—answering at A8 loses 1 point! Push at G2 on the bottom border instead.",
+        "B9": "B8 is already dead—don't play inside your own territory! Push at G2 to squeeze White's bottom-right corner in Sente.",
+        "default": "Ignore White's dead B8 stone in the top-left and push at G2 on the bottom border first, then connect at F1."
+      }
     }
   ]
 }

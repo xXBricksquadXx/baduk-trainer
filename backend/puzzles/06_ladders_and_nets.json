@@ -170,6 +170,51 @@
       "wrongHints": {
         "default": "Keep White pinned to the bottom edge—play F3 or E3 to close off its escape into the center."
       }
+    },
+    {
+      "id": "college-07",
+      "title": "3-Step Capturing Race (Semeai) Order",
+      "rank": "12k",
+      "concept": "When two adjacent enemy groups trap your cutting stones between them, always reduce the liberties of the weaker group first so capturing it gives your stones breathing room to finish the second group.",
+      "prompt": "Your cutting stones (F5, F6, G6) separate White's top-right corner (H8, J7) from White's lower-right chain (H3, H2, J3). Win the capturing race by attacking in the right order!",
+      "turn": 1,
+      "stones": [
+        { "coord": "F5", "color": 1 },
+        { "coord": "F6", "color": 1 },
+        { "coord": "G6", "color": 1 },
+        { "coord": "G7", "color": 1 },
+        { "coord": "F4", "color": 1 },
+        { "coord": "G2", "color": 1 },
+        { "coord": "H8", "color": 2 },
+        { "coord": "J7", "color": 2 },
+        { "coord": "H7", "color": 2 },
+        { "coord": "H3", "color": 2 },
+        { "coord": "H2", "color": 2 },
+        { "coord": "J3", "color": 2 },
+        { "coord": "G4", "color": 2 }
+      ],
+      "steps": [
+        {
+          "move": "H4",
+          "reply": "J4",
+          "feedback": "Step 1 complete! H4 cuts G4 off from the bottom-right group—White extends to J4. Keep reducing the bottom group's liberties first!"
+        },
+        {
+          "move": "H1",
+          "reply": "J2",
+          "feedback": "Step 2 complete! H1 removes White's 1st-line base—White connects at J2 with only 1 liberty left. Now finish the bottom group!"
+        },
+        {
+          "move": "J1",
+          "reply": null,
+          "feedback": "Step 3 complete! Capturing the bottom-right chain restores all liberties to your F5-G7 wall, leaving White's top-right corner completely trapped!"
+        }
+      ],
+      "wrongHints": {
+        "H9": "Attacking the top-right at H9 first lets White play H4 and capture your F5-G7 cutting stones before you win the race!",
+        "J8": "Attacking the top-right at J8 first gives White time to play H4 and collapse your center wall! Reduce the bottom-right liberties at H4 first.",
+        "default": "Win the lower-right capturing race first: play H4 to split White's right side, then H1 and J1."
+      }
     }
   ]
 }
