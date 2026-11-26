@@ -105,7 +105,7 @@ export function useMatchEngine({
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data.engineUsed) setLastEngineUsed(data.engineUsed);
-        const engineTag = data.engineUsed ? ` [${data.engineUsed}]` : '';
+        const engineTag = data.engineUsed ? ` • ${data.engineUsed}` : '';
 
         if (data.move === 'PASS') {
           const nextPasses = activePasses + 1;
