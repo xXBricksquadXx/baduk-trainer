@@ -26,6 +26,7 @@ export function useMatchEngine({
   clearCoaching,
   onProgressUpdate,
   onSwitchToMatchTab,
+  onSgfImported,
 }) {
   const [handicapId, setHandicapId] = useState('even');
   const [board, setBoard] = useState(() => createInitialBoard(0));
@@ -37,6 +38,7 @@ export function useMatchEngine({
   const [consecutivePasses, setConsecutivePasses] = useState(0);
   const [gameResult, setGameResult] = useState(null);
   const [sgfMeta, setSgfMeta] = useState(null);
+  const [lastEngineUsed, setLastEngineUsed] = useState(null);
 
   const [vsAi, setVsAi] = useState(true);
   const [humanColor, setHumanColor] = useState(BLACK);
@@ -102,6 +104,8 @@ export function useMatchEngine({
 
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
+        if (data.engineUsed) setLastEngineUsed(data.engineUsed);
+        const engineTag = data.engineUsed ? ` [${data.engineUsed}]` : '';
 
         if (data.move === 'PASS') {
           const nextPasses = activePasses + 1;
@@ -134,7 +138,7 @@ export function useMatchEngine({
             setConsecutivePasses(nextPasses);
             setCurrentTurn(activeHumanColor);
             setStatusBanner(
-              `AI Sensei (${data.rankLabel}) passed — Your turn.`,
+              `AI Sensei (${data.rankLabel}${engineTag}) passed — Your turn.`,
             );
           }
         } else {
@@ -170,7 +174,7 @@ export function useMatchEngine({
           setConsecutivePasses(0);
           setCurrentTurn(activeHumanColor);
           setStatusBanner(
-            `AI Sensei (${data.rankLabel}) played ${data.move}${capNote} — Your turn.`,
+            `AI Sensei (${data.rankLabel}${engineTag}) played ${data.move}${capNote} — Your turn.`,
           );
         }
       } catch (err) {
@@ -199,6 +203,7 @@ export function useMatchEngine({
 
       clearCoaching();
       setSgfMeta(null);
+      setLastEngineUsed(null);
       setVsAi(nextVsAi);
       setHumanColor(nextHumanColor);
       setHandicapId(nextHandicapId);
@@ -513,6 +518,7 @@ export function useMatchEngine({
       clearCoaching();
       setVsAi(false);
       setSgfMeta(meta);
+      setLastEngineUsed(null);
       setBoard(simBoard);
       setCurrentTurn(simTurn);
       setCaptures(simCaps);
@@ -521,8 +527,9 @@ export function useMatchEngine({
       setRedoStack([]);
       setGameResult(null);
       onSwitchToMatchTab();
+      onSgfImported?.();
       setStatusBanner(
-        `Loaded ${file.name}: ${bHeader} vs ${wHeader}${resNote} (${rebuiltHistory.length} moves).`,
+        `Loaded ${file.name}: ${bHeader} vs ${wHeader}${resNote} (${rebuiltHistory.length} moves — 3B Sensei Review active).`,
       );
     };
     reader.readAsText(file);
@@ -540,6 +547,7 @@ export function useMatchEngine({
     redoStack,
     gameResult,
     sgfMeta,
+    lastEngineUsed,
     vsAi,
     humanColor,
     aiThinking,

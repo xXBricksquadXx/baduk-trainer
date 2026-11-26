@@ -22,7 +22,7 @@ export function useSenseiCoach({
   const [hintsLoading, setHintsLoading] = useState(false);
   const [senseiLoading, setSenseiLoading] = useState(false);
   const [explanationData, setExplanationData] = useState(null);
-  const [senseiModel, setSenseiModel] = useState('qwen2.5-coder:3b');
+  const [senseiModel, setSenseiModel] = useState('katago-instant');
 
   const clearCoaching = useCallback(() => {
     setHints([]);

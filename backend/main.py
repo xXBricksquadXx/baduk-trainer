@@ -43,7 +43,6 @@ def _load_all_packs() -> List[dict]:
     for fpath in sorted(PUZZLES_DIR.glob("*.json")):
         with open(fpath, "r", encoding="utf-8") as f:
             pack = json.load(f)
-            # Hydrate each puzzle with a ready-to-render 9x9 board matrix
             for p in pack.get("puzzles", []):
                 b = create_empty_board()
                 for st in p.get("stones", []):
@@ -74,7 +73,7 @@ def _build_console_banner() -> str:
 + -- --=[ Board   : {BOARD_SIZE}x{BOARD_SIZE} Goban | Ranks: 30 Kyu -> 1 Dan            ]
 + -- --=[ Dojo    : {len(packs)} Curriculum Packs ({drill_count} tactical drills)      ]
 + -- --=[ Profile : {stats['estimatedRank']:<10} | Record: {stats['matchWins']}W-{stats['totalMatches'] - stats['matchWins']}L ({stats['winRate']}%)     ]
-+ -- --=[ Sensei  : Local Ollama Bridge (3B Fast / 7B Deep)   ]
++ -- --=[ Sensei  : GPU Instant Default + Ollama SGF Review   ]
 """
 
 
@@ -112,7 +111,7 @@ class ExplainRequest(BaseModel):
     koPoint: Optional[List[int]] = None
     mode: str = "hint"
     rank: str = "25k"
-    model: str = "qwen2.5-coder:3b"
+    model: str = "katago-instant"
 
 
 @app.get("/api/health")
@@ -137,6 +136,11 @@ def get_ai_move(req: MoveRequest):
 
     choice = choose_ai_move(req.board, req.color, ko_tuple, rank=req.rank)
     profile = rank_label_to_strength(req.rank)
+    engine_used = (
+        "KataGo GPU"
+        if any("KataGo" in t for t in choice.get("tags", []))
+        else "Python MCTS"
+    )
 
     if choice["move"] == "PASS":
         return {
@@ -148,6 +152,7 @@ def get_ai_move(req: MoveRequest):
             "koPoint": None,
             "winrate": choice["winrate"],
             "rankLabel": profile["label"],
+            "engineUsed": engine_used,
         }
 
     applied = apply_move(req.board, choice["row"], choice["col"], req.color, ko_tuple)
@@ -161,6 +166,7 @@ def get_ai_move(req: MoveRequest):
             "koPoint": None,
             "winrate": choice["winrate"],
             "rankLabel": profile["label"],
+            "engineUsed": engine_used,
         }
 
     return {
@@ -172,6 +178,7 @@ def get_ai_move(req: MoveRequest):
         "koPoint": list(applied["ko_point"]) if applied["ko_point"] else None,
         "winrate": choice["winrate"],
         "rankLabel": profile["label"],
+        "engineUsed": engine_used,
     }
 
 
@@ -268,7 +275,6 @@ def submit_puzzle_attempt(req: PuzzleAttemptRequest):
     move_upper = req.move.strip().upper()
     steps = target_puzzle.get("steps")
 
-    # Multi-step sequential drill mode
     if steps and 0 <= req.stepIndex < len(steps):
         current_step = steps[req.stepIndex]
         accepted = [
@@ -311,7 +317,6 @@ def submit_puzzle_attempt(req: PuzzleAttemptRequest):
             "progress": progress,
         }
 
-    # Standard 1-step solution list mode (backward compatible)
     matched = next(
         (
             s

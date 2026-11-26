@@ -16,12 +16,12 @@ An interactive 9x9 Go (Baduk) trainer pairing a calibrated 30 Kyu – 1 Dan engi
 
 ## Why AI Sensei 9x9?
 
-> **TL;DR:** A local-first 9x9 Go dojo built to take a player from **30 Kyu → 1 Dan** through visual board overlays (`Territory + Early-Game Influence` & `Chain Liberties`), an interactive **9x9 Opening & Joseki Explorer**, toggleable **3B Fast / 7B Deep** local Ollama coaching, metadata-rich SGF game review, and a 7-module High School-to-College puzzle curriculum backed by an AGA/Glicko-weighted SQLite skill rubric.
+> **TL;DR:** A local-first 9x9 Go dojo built to take a player from **30 Kyu → 1 Dan** through visual board overlays (`Territory + Early-Game Influence` & `Chain Liberties`), a hybrid **Python MCTS + KataGo OpenCL GPU** engine, toggleable **GPU Instant / 3B / 7B** local coaching, an interactive **9x9 Opening & Joseki Explorer**, metadata-rich SGF game review, and a 7-module High School-to-College puzzle curriculum backed by an AGA/Glicko-weighted SQLite skill rubric.
 
 Most Go apps treat **20 Kyu** as "beginner" and drop 30-Kyu newcomers straight into cryptic life-and-death puzzles without explaining _how to build from an empty board_ or _why_ a move works. **AI Sensei 9x9** bridges that gap through visual feedback, immediate tactical explanations, and weighted progression metrics:
 
-- **Calibrated AI Opponent (`30 Kyu` → `1 Dan`) & Endgame Pass Detection:** Scales candidate pool breadth, tactical reading depth, and Monte Carlo rollouts so novice ranks play genuine exploratory shapes while single-digit Kyu and Dan ranks punish overplays—and automatically detects when all territory borders are sealed (zero neutral _dame_ left) to recommend passing instead of eye-filling.
-- **Interactive Rank 1–4 Hint Silhouettes & `3B Fast` / `7B Deep` Toggle:** Project the engine's top 4 candidate moves onto the SVG Goban in <150 ms without blocking board interaction. Switch on the fly between **`3B Fast`** (`qwen2.5-coder:3b`, ~2s tactical reads for rapid puzzle reps on CPU/RAM) and **`7B Deep`** (`qwen2.5-coder:7b`, deeper post-game analysis), and click any selected silhouette again to place the stone.
+- **Hybrid Engine (`30 Kyu` → `6 Kyu` Python MCTS + `3 Kyu` → `1 Dan+` KataGo GPU):** Novice and mid-Kyu ranks run on a calibrated Python MCTS engine that plays recoverable, shape-teaching patterns, while `3 Kyu`, `1 Dan`, and candidate evaluations automatically route to a persistent **KataGo OpenCL GPU** GTP session (`katago_gtp.py`) for sharp single-digit Kyu and Dan sparring with live `[KataGo GPU]` / `[Python MCTS]` telemetry.
+- **Interactive Rank 1–4 Hint Silhouettes & `GPU` / `3B` / `7B` Toggle:** Project KataGo's top 4 candidate moves onto the SVG Goban in <150 ms without blocking board interaction. Defaults to zero-CPU **`GPU Instant`** telemetry reads during live play, with one-click switching to **`3B`** (`qwen2.5-coder:3b`) or **`7B`** (`qwen2.5-coder:7b`) local Ollama coaching (auto-engaged when importing an SGF for post-game review).
 - **9x9 Opening & Joseki Explorer:** Interactive move-tree explorer covering **Tengen (`E5`)**, **San-San (`3-3`)**, **Komoku (`3-4`)**, and **Hoshi (`4-4`)** 9x9 opening frameworks with clickable numbered continuations (`#1`–`#4`), breadcrumb navigation, Japanese/English Go terminology, and one-click Sensei shape reads.
 - **Spatial-Grounded Sensei Explanations:** Serializes exact stone inventories, orthogonal neighbor states, and Atari chain scans before prompting the local LLM—eliminating coordinate hallucinations.
 - **Visual Goban Overlays & Board-Footer Advantage Bar:** Toggle **`Territory: ON`** (displaying both 100% sealed territory squares and early-game Manhattan influence dots before walls close) and **`Liberties: ON`** (inward-aligned liberty badges on every connected stone chain with crimson Atari alerts), paired with a live `#349259` emerald **Area Advantage Bar** right beneath the board.
@@ -30,9 +30,9 @@ Most Go apps treat **20 Kyu** as "beginner" and drop 30-Kyu newcomers straight i
 
 ### Roadmap
 
-- **1 Dan Milestone & 13x13 Board Size Expansion:** Lock in **1 Dan** mastery on 9x9, then introduce a `9x9` / `13x13` board size toggle built cleanly on top of the modularized React hook architecture (`useMatchEngine`, `useDojoCurriculum`, `useSenseiCoach`) to bridge compact tactical reading into side-territory frameworks (_moyo_) and invasion timing.
-- **Curriculum & Opening Tree Expansion:** Continual addition of single-digit Kyu and Dan multi-step _semeai_ / _ko_ JSON drills and deeper 9x9 _Joseki_ variations.
-- **KataGo / GNU Go Engine Hook:** Drop-in neural policy/value integration via `backend/engine_bridge.py` for high-Dan sparring and deep post-game winrate graphs.
+- **13x13 Board Size Toggle:** Introduce a `9x9` / `13x13` board size switch built cleanly on top of the modularized React hook architecture (`useMatchEngine`, `useDojoCurriculum`, `useSenseiCoach`) and KataGo GTP session to bridge compact tactical reading into side-territory frameworks (_moyo_) and corner _joseki_.
+- **1 Dan+ Sparring & SGF Post-Game Review Polish:** Push past **1 Dan** against KataGo GPU and expand multi-move SGF review workflows with Ollama `3B`/`7B`.
+- **Curriculum Expansion:** Continual addition of single-digit Kyu and Dan multi-step _semeai_ / _ko_ JSON drills.
 
 ---
 
@@ -41,11 +41,13 @@ Most Go apps treat **20 Kyu** as "beginner" and drop 30-Kyu newcomers straight i
 ```text
 baduk-trainer/
 ├── backend/
-│   ├── main.py              # FastAPI REST endpoints (/ai-move, /hints, /explain, /joseki, /puzzles, /metrics)
+│   ├── main.py              # FastAPI REST endpoints, lifespan warmup & ASCII telemetry banner
 │   ├── go_rules.py          # 9x9 rules engine, liberty flood-fill, Ko validation, area scoring
-│   ├── engine_bridge.py     # 30k–1d calibrated MCTS/heuristic engine (+ sealed-border pass & KataGo hook)
-│   ├── sensei_agent.py      # Spatial-grounded Ollama client (qwen2.5-coder:7b / 3b toggle)
+│   ├── engine_bridge.py     # Hybrid router: 30k–6k Python MCTS + 3k–1d KataGo GPU delegation
+│   ├── katago_gtp.py        # Persistent OpenCL GPU KataGo GTP subprocess & kata-analyze parser
+│   ├── sensei_agent.py      # GPU Instant telemetry formatter + spatial-grounded Ollama client (3B/7B)
 │   ├── metrics_db.py        # SQLite persistence for AGA/Glicko-weighted rank rubric & match history
+│   ├── engine/              # Local KataGo OpenCL binary, b10c128 weights (gitignored) & gtp.cfg
 │   ├── joseki/              # Interactive 9x9 opening & joseki variation tree (9x9_openings.json)
 │   └── puzzles/             # Auto-loaded JSON curriculum packs (01_opening -> 07_endgame_yose)
 └── frontend/
@@ -53,15 +55,14 @@ baduk-trainer/
         ├── components/
         │   └── Goban9x9.jsx          # Responsive SVG 9x9 board with influence heatmap, liberties & hint overlays
         ├── hooks/
-        │   ├── useMatchEngine.js     # Match state, AI turn execution, undo/redo stacks & SGF import/export
+        │   ├── useMatchEngine.js     # Match state, AI turn loop, undo/redo stacks & SGF import/export
         │   ├── useDojoCurriculum.js  # Multi-step puzzle progression, Joseki tree traversal & SQLite metrics
-        │   └── useSenseiCoach.js     # Candidate evaluation, Ollama explanations & 3B/7B model switching
+        │   └── useSenseiCoach.js     # Candidate evaluation, GPU/3B/7B model switching & explanations
         ├── utils/
         │   └── goLogic.js            # Client-side Go rules, SGF header serializer/parser & territory estimator
         └── App.jsx                   # Slim UI layout shell for Match Play, Dojo, Joseki & Progress views
-```
 
----
+```
 
 ## Local Setup & Run
 
@@ -69,12 +70,16 @@ baduk-trainer/
 
 - Python 3.11+
 - Node.js 20+
-- Ollama running locally with qwen2.5-coder:7b (and optional qwen2.5-coder:3b fast fallback):
+- _(Optional — for 3B/7B natural-language Sensei prose & SGF reviews)_ Ollama running locally:
 
 ```bash
 ollama pull qwen2.5-coder:7b
 ollama pull qwen2.5-coder:3b
 ```
+
+- _(Optional — for `3 Kyu` / `1 Dan` GPU sparring & instant GPU evaluations)_ Drop local KataGo OpenCL binaries into `backend/engine/` (auto-falls back to Python MCTS if omitted):
+  - **Binary:** Download `-opencl-windows-x64.zip` from [KataGo Releases](https://github.com/lightvector/KataGo/releases) and extract `katago.exe` into `backend/engine/`.
+  - **Network:** Download a lightweight `b10c128` `.bin.gz` weight file from [KataGo Networks](https://katagotraining.org/networks/) and save as `backend/engine/model.bin.gz` (or `.txt`) alongside `backend/engine/gtp.cfg`.
 
 **2. Start the FastAPI Backend**
 

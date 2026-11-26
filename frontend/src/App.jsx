@@ -57,6 +57,7 @@ export default function App() {
   const [showLiberties, setShowLiberties] = useState(false);
 
   const clearCoachingRef = useRef(() => {});
+  const switchModelRef = useRef(() => {});
   const clearCoaching = useCallback(() => clearCoachingRef.current(), []);
 
   const dojo = useDojoCurriculum({
@@ -73,6 +74,7 @@ export default function App() {
     clearCoaching,
     onProgressUpdate: dojo.setProgressStats,
     onSwitchToMatchTab: () => setActiveTab('match'),
+    onSgfImported: () => switchModelRef.current('qwen2.5-coder:3b'),
   });
 
   const coach = useSenseiCoach({
@@ -94,7 +96,8 @@ export default function App() {
 
   useEffect(() => {
     clearCoachingRef.current = coach.clearCoaching;
-  }, [coach.clearCoaching]);
+    switchModelRef.current = coach.setSenseiModel;
+  }, [coach.clearCoaching, coach.setSenseiModel]);
 
   const liveAdvantage =
     activeTab === 'match'
@@ -172,21 +175,30 @@ export default function App() {
     <div className="model-toggle-group">
       <button
         type="button"
+        className={`mini-toggle ${coach.senseiModel === 'katago-instant' ? 'active' : ''}`}
+        onClick={() => coach.setSenseiModel('katago-instant')}
+        disabled={coach.senseiLoading}
+        title="Zero-CPU instant GPU evaluation & tactical scan"
+      >
+        GPU
+      </button>
+      <button
+        type="button"
         className={`mini-toggle ${coach.senseiModel === 'qwen2.5-coder:3b' ? 'active' : ''}`}
         onClick={() => coach.setSenseiModel('qwen2.5-coder:3b')}
         disabled={coach.senseiLoading}
-        title="Fast ~2s tactical reads via qwen2.5-coder:3b"
+        title="Fast tactical prose via Ollama qwen2.5-coder:3b"
       >
-        3B Fast
+        3B
       </button>
       <button
         type="button"
         className={`mini-toggle ${coach.senseiModel === 'qwen2.5-coder:7b' ? 'active' : ''}`}
         onClick={() => coach.setSenseiModel('qwen2.5-coder:7b')}
         disabled={coach.senseiLoading}
-        title="Deeper analysis via qwen2.5-coder:7b"
+        title="Deep SGF review prose via Ollama qwen2.5-coder:7b"
       >
-        7B Deep
+        7B
       </button>
     </div>
   );
@@ -197,7 +209,11 @@ export default function App() {
         <div className="brand">
           <img src="/logo.jpg" alt="AI Sensei 9x9" className="brand-logo" />
           <h1>AI Sensei 9x9</h1>
-          <span className="badge">{dojo.engineStatus}</span>
+          <span className="badge">
+            {match.lastEngineUsed
+              ? `Active: ${match.lastEngineUsed}`
+              : dojo.engineStatus}
+          </span>
           <span className="badge">
             Rank: {dojo.progressStats.estimatedRank}
           </span>
@@ -546,7 +562,7 @@ export default function App() {
 
                 <div className="sensei-output mt-10">
                   {coach.senseiLoading ? (
-                    <p className="muted">Consulting Sensei via Ollama...</p>
+                    <p className="muted">Consulting Sensei...</p>
                   ) : coach.explanationData ? (
                     <div className="explain-body">
                       {renderFormattedSenseiText(
@@ -729,7 +745,7 @@ export default function App() {
 
                 <div className="sensei-output mt-10">
                   {coach.senseiLoading ? (
-                    <p className="muted">Consulting Sensei via Ollama...</p>
+                    <p className="muted">Consulting Sensei...</p>
                   ) : coach.explanationData ? (
                     <>
                       <div className="explain-meta">
@@ -976,7 +992,7 @@ export default function App() {
                 <div className="sensei-output mt-10">
                   {coach.senseiLoading ? (
                     <p className="muted">
-                      Consulting {aiRank.toUpperCase()} Sensei via Ollama...
+                      Consulting {aiRank.toUpperCase()} Sensei...
                     </p>
                   ) : coach.explanationData ? (
                     <>

@@ -87,6 +87,61 @@ def describe_board_facts(board: List[List[int]], target_move: str) -> str:
     )
 
 
+def _format_katago_instant(
+    target_move: str,
+    turn_label: str,
+    candidate_info: Optional[Dict[str, Any]],
+    top_candidates: List[Dict[str, Any]],
+    tactics: Dict[str, List[str]],
+    mode: str,
+) -> str:
+    if (
+        candidate_info
+        and "all borders sealed — pass recommended" in candidate_info.get("tags", [])
+    ):
+        return (
+            f"- **Core Purpose:** All territory borders are 100% sealed (zero neutral dame left).\n"
+            f"- **Tactical Read:** Playing {target_move} adds +0 net points under Area Scoring.\n"
+            f"- **Action:** Click **Pass** now to lock in the score."
+        )
+
+    best = top_candidates[0] if top_candidates else None
+    atari_notes = []
+    if tactics["black_atari"]:
+        atari_notes.append(f"Black in Atari: {', '.join(tactics['black_atari'])}")
+    if tactics["white_atari"]:
+        atari_notes.append(f"White in Atari: {', '.join(tactics['white_atari'])}")
+    atari_line = (
+        "; ".join(atari_notes)
+        if atari_notes
+        else "No groups in immediate 1-liberty Atari."
+    )
+
+    if candidate_info:
+        wr = candidate_info.get("winrate", 50.0)
+        lead = candidate_info.get("scoreLead", 0.0)
+        tags_str = ", ".join(candidate_info.get("tags", ["tactical continuation"]))
+        comp = (
+            f"Matches KataGo's #1 choice ({wr}% winrate, {lead:+.1f} pts)."
+            if not best or best["move"].upper() == target_move.upper()
+            else f"#{best['rank']} **{best['move']}** ({best['winrate']}%, {best['scoreLead']:+.1f} pts) rates slightly higher."
+        )
+        return (
+            f"- **GPU Evaluation:** **{target_move}** — {wr}% winrate ({lead:+.1f} pts) [{tags_str}].\n"
+            f"- **Board Scan:** {atari_line}\n"
+            f"- **Comparison:** {comp} *(Switch to 3B/7B for full prose coaching)*"
+        )
+
+    if mode == "last_move" and best:
+        return (
+            f"- **Played Move:** {turn_label} played **{target_move}**.\n"
+            f"- **GPU Top Choice:** **{best['move']}** ({best['winrate']}% winrate, {best['scoreLead']:+.1f} pts).\n"
+            f"- **Board Scan:** {atari_line}"
+        )
+
+    return f"- **GPU Read:** **{target_move}** develops local shape. {atari_line}"
+
+
 def _fallback_explanation(
     target_move: str,
     turn_label: str,
@@ -155,17 +210,29 @@ async def explain_move_with_sensei(
     top_candidates: Optional[List[Dict[str, Any]]] = None,
     mode: str = "hint",  # "hint" | "last_move"
     user_rank: str = "25k",
-    model: str = PRIMARY_MODEL,
+    model: str = "katago-instant",
 ) -> Dict[str, Any]:
     top_candidates = top_candidates or []
     turn_label = "Black (X)" if turn_color == BLACK else "White (O)"
-    ascii_grid = render_ascii_board(board)
     tactics = scan_board_tactics(board)
-    board_facts = describe_board_facts(board, target_move)
 
     candidate_info = next(
         (c for c in top_candidates if c["move"].upper() == target_move.upper()), None
     )
+
+    # Zero-CPU instant GPU telemetry read (default during live play)
+    if model == "katago-instant":
+        return {
+            "move": target_move,
+            "explanation": _format_katago_instant(
+                target_move, turn_label, candidate_info, top_candidates, tactics, mode
+            ),
+            "model": "katago-instant",
+            "source": "gpu-instant",
+        }
+
+    ascii_grid = render_ascii_board(board)
+    board_facts = describe_board_facts(board, target_move)
 
     candidates_summary = "\n".join(
         [
