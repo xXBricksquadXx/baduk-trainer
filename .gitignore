@@ -8,6 +8,13 @@ backend/.venv/
 backend/__pycache__/
 *.pyc
 backend/data/*.db
+backend/engine/*.exe
+backend/engine/*.dll
+backend/engine/*.gz
+backend/engine/*.txt
+backend/engine/KataGoData/
+backend/engine/gtp_logs/
+backend/gtp_logs/
 
 # OS / Editor
 .DS_Store

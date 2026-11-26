@@ -15,6 +15,7 @@ from go_rules import (
     estimate_area_score,
     to_coord,
 )
+from katago_gtp import is_katago_ready, katago_session
 
 ENGINE_DIR = Path(__file__).parent / "engine"
 
@@ -33,13 +34,29 @@ POSITION_WEIGHTS = [
 
 
 def detect_engine_backend() -> str:
-    katago_bin = ENGINE_DIR / "katago.exe"
     gnugo_bin = ENGINE_DIR / "gnugo.exe"
-    if katago_bin.exists():
-        return "katago-local"
+    if is_katago_ready():
+        return "hybrid (mcts + katago-gpu)"
     if gnugo_bin.exists():
         return "gnugo-local"
     return "python-mcts-calibrated"
+
+
+def _should_use_katago(rank: str, board_size: int = BOARD_SIZE) -> bool:
+    """Routes 3k, 1d+, and 13x13 boards to KataGo GPU while keeping 30k-6k on Python MCTS."""
+    if not is_katago_ready():
+        return False
+    if board_size > 9:
+        return True
+    r = rank.strip().lower()
+    if r.endswith("d"):
+        return True
+    if r.endswith("k"):
+        try:
+            return int(r[:-1]) <= 3
+        except ValueError:
+            return False
+    return False
 
 
 def rank_label_to_strength(rank: str) -> Dict[str, Any]:
@@ -62,8 +79,7 @@ def rank_label_to_strength(rank: str) -> Dict[str, Any]:
         except ValueError:
             kyu = 20
 
-    skill = (31 - kyu) / 30.0  # 0.033 at 30k -> 1.0 at 1k
-    # Tightens candidate pool from 35 (30k) -> 16 (15k) -> 3 (3k/1k)
+    skill = (31 - kyu) / 30.0
     shortlist_size = int(36 - skill * 32)
     return {
         "label": f"{kyu} Kyu",
@@ -71,9 +87,7 @@ def rank_label_to_strength(rank: str) -> Dict[str, Any]:
         "rollouts": int(6 + (skill**1.25) * 100),
         "noise": round(max(0.05, (1.0 - skill) * 4.5), 2),
         "tactical_mult": round(0.25 + skill * 1.15, 2),
-        "blunder_rate": round(
-            max(0.0, (kyu - 18) / 20.0), 2
-        ),  # 0.60 at 30k, 0.0 at 18k and stronger
+        "blunder_rate": round(max(0.0, (kyu - 18) / 20.0), 2),
     }
 
 
@@ -149,17 +163,25 @@ def _evaluate_tactical_move(
         score -= 8.0
         tags.append("fills own eye")
 
-    # 3. Check self-group liberties (avoid self-atari & rescue 2-liberty multi-stone chains)
+    # 3. Check self-group liberties (guard against hopeless throw-ins & 2-liberty chains)
     self_stones, self_libs = get_group_and_liberties(next_board, row, col)
     if self_libs == 1 and res["captured_count"] == 0:
-        score -= 4.5 + 0.8 * len(self_stones)
-        tags.append("self-atari risk")
+        can_capture_next = any(
+            next_board[nr][nc] == opponent
+            and get_group_and_liberties(next_board, nr, nc)[1] == 1
+            for nr, nc in get_neighbors(row, col)
+        )
+        if not can_capture_next:
+            score -= 9.5 + 1.2 * len(self_stones)
+            tags.append("hopeless self-atari throw-in")
+        else:
+            score -= 3.5 + 0.6 * len(self_stones)
+            tags.append("snapback / atari gamble")
     elif self_libs == 2 and len(self_stones) >= 3 and res["captured_count"] == 0:
         score -= 1.6 + 0.35 * len(self_stones)
         tags.append("low-liberty group risk")
     elif self_libs >= 3:
         score += 0.6
-        # Bonus if this move rescued a friendly group that previously had only 2 liberties
         for nr, nc in get_neighbors(row, col):
             if board[nr][nc] == color:
                 old_stones, old_libs = get_group_and_liberties(board, nr, nc)
@@ -217,7 +239,6 @@ def _quick_rollout(
         chosen_res = None
         chosen_pt = None
 
-        # 1. Local tactical response: check liberties around the previous move first
         if last_pt is not None:
             lr, lc = last_pt
             local_targets = [(lr, lc)] + get_neighbors(lr, lc)
@@ -225,7 +246,6 @@ def _quick_rollout(
                 if sim_board[tr][tc] != EMPTY:
                     stones, libs = get_group_and_liberties(sim_board, tr, tc)
                     if libs == 1:
-                        # Find the single remaining liberty to either capture or escape
                         for sr, sc in stones:
                             for nr, nc in get_neighbors(sr, sc):
                                 if sim_board[nr][nc] == EMPTY and not _is_true_eye(
@@ -241,7 +261,6 @@ def _quick_rollout(
                 if chosen_res:
                     break
 
-        # 2. Fallback to stochastic probes
         if chosen_res is None:
             for _attempt in range(14):
                 r = random.randrange(BOARD_SIZE)
@@ -278,6 +297,29 @@ def evaluate_candidates(
     rank: str = "15k",
     top_k: int = 4,
 ) -> List[Dict[str, Any]]:
+    # Hybrid path: use KataGo GPU for 3k/1d+ and 13x13 candidate analysis
+    if _should_use_katago(rank, len(board)):
+        try:
+            kg_hints = katago_session.analyze_position(
+                board, color, rank=rank, top_k=top_k
+            )
+            if kg_hints:
+                # Filter out any illegal Ko recapture just in case
+                valid_kg = []
+                for h in kg_hints:
+                    if h["move"] == "PASS":
+                        valid_kg.append(h)
+                    else:
+                        chk = apply_move(board, h["row"], h["col"], color, ko_point)
+                        if chk["valid"]:
+                            valid_kg.append(h)
+                if valid_kg:
+                    for idx, item in enumerate(valid_kg[:top_k], start=1):
+                        item["rank"] = idx
+                    return valid_kg[:top_k]
+        except Exception:
+            pass  # Fall back seamlessly to Python MCTS
+
     profile = rank_label_to_strength(rank)
     legal = get_legal_moves(board, color, ko_point)
     if not legal:
@@ -348,6 +390,31 @@ def choose_ai_move(
     ko_point: Optional[Tuple[int, int]] = None,
     rank: str = "15k",
 ) -> Dict[str, Any]:
+    stone_count = sum(1 for r in board for c in r if c != EMPTY)
+    if _all_borders_sealed(board):
+        return {
+            "move": "PASS",
+            "row": -1,
+            "col": -1,
+            "winrate": 50.0,
+            "tags": ["all borders sealed — endgame pass"],
+        }
+
+    # Hybrid path: KataGo GPU handles 3k, 1d+, and 13x13 matches
+    if _should_use_katago(rank, len(board)):
+        try:
+            kg_choice = katago_session.genmove(board, color, rank=rank)
+            if kg_choice is not None:
+                if kg_choice["move"] == "PASS":
+                    return kg_choice
+                chk = apply_move(
+                    board, kg_choice["row"], kg_choice["col"], color, ko_point
+                )
+                if chk["valid"]:
+                    return kg_choice
+        except Exception:
+            pass  # Fall back seamlessly to Python MCTS
+
     candidates = evaluate_candidates(board, color, ko_point, rank=rank, top_k=5)
     if not candidates:
         return {
@@ -358,11 +425,7 @@ def choose_ai_move(
             "tags": ["no legal moves"],
         }
 
-    # Pass in late endgame if all territory borders are sealed or only eye-filling remains
-    stone_count = sum(1 for r in board for c in r if c != EMPTY)
-    if _all_borders_sealed(board) or (
-        stone_count > 52 and "fills own eye" in candidates[0]["tags"]
-    ):
+    if stone_count > 52 and "fills own eye" in candidates[0]["tags"]:
         return {
             "move": "PASS",
             "row": -1,

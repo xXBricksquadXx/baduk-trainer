@@ -20,6 +20,8 @@ from engine_bridge import (
     detect_engine_backend,
     rank_label_to_strength,
 )
+from katago_gtp import katago_session
+
 from metrics_db import (
     init_db,
     record_puzzle_result,
@@ -78,8 +80,10 @@ def _build_console_banner() -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    katago_session.start()
     print(_build_console_banner(), flush=True)
     yield
+    katago_session.stop()
 
 
 app = FastAPI(title="Baduk Trainer 9x9 API", version="0.2.0", lifespan=lifespan)
