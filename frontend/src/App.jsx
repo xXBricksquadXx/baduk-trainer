@@ -1,4 +1,3 @@
-// frontend\src\App.jsx
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Goban9x9 from './components/Goban9x9';
 import { useMatchEngine, HANDICAP_OPTIONS } from './hooks/useMatchEngine';
@@ -58,23 +57,29 @@ export default function App() {
 
   const clearCoachingRef = useRef(() => {});
   const switchModelRef = useRef(() => {});
+  const setProgressRef = useRef(() => {});
   const clearCoaching = useCallback(() => clearCoachingRef.current(), []);
-
-  const dojo = useDojoCurriculum({
-    apiBase: API_BASE,
-    clearCoaching,
-    setStatusBanner,
-  });
+  const handleProgressUpdate = useCallback(
+    (p) => setProgressRef.current(p),
+    [],
+  );
 
   const match = useMatchEngine({
     apiBase: API_BASE,
     aiRank,
-    userRankLabel: dojo.progressStats.estimatedRank,
+    userRankLabel: '1.6 Kyu',
     setStatusBanner,
     clearCoaching,
-    onProgressUpdate: dojo.setProgressStats,
+    onProgressUpdate: handleProgressUpdate,
     onSwitchToMatchTab: () => setActiveTab('match'),
     onSgfImported: () => switchModelRef.current('qwen2.5-coder:3b'),
+  });
+
+  const dojo = useDojoCurriculum({
+    apiBase: API_BASE,
+    boardSize: match.boardSize,
+    clearCoaching,
+    setStatusBanner,
   });
 
   const coach = useSenseiCoach({
@@ -97,7 +102,8 @@ export default function App() {
   useEffect(() => {
     clearCoachingRef.current = coach.clearCoaching;
     switchModelRef.current = coach.setSenseiModel;
-  }, [coach.clearCoaching, coach.setSenseiModel]);
+    setProgressRef.current = dojo.setProgressStats;
+  }, [coach.clearCoaching, coach.setSenseiModel, dojo.setProgressStats]);
 
   const liveAdvantage =
     activeTab === 'match'
@@ -207,8 +213,14 @@ export default function App() {
     <div className="app-shell">
       <header className="top-bar">
         <div className="brand">
-          <img src="/logo.jpg" alt="AI Sensei 9x9" className="brand-logo" />
-          <h1>AI Sensei 9x9</h1>
+          <img
+            src="/logo.jpg"
+            alt={`AI Sensei ${match.boardSize}x${match.boardSize}`}
+            className="brand-logo"
+          />
+          <h1>
+            AI Sensei {match.boardSize}x{match.boardSize}
+          </h1>
           <span className="badge">
             {match.lastEngineUsed
               ? `Active: ${match.lastEngineUsed}`
@@ -228,7 +240,7 @@ export default function App() {
               setStatusBanner(
                 match.gameResult
                   ? `Match complete — ${match.gameResult.winner} won by ${match.gameResult.margin} pts.`
-                  : `${match.currentTurn === BLACK ? 'Black' : 'White'} to play.`,
+                  : `${match.boardSize}x${match.boardSize} — ${match.currentTurn === BLACK ? 'Black' : 'White'} to play.`,
               );
             }}
           >
@@ -251,7 +263,7 @@ export default function App() {
               clearCoaching();
               setActiveTab('joseki');
               setStatusBanner(
-                'Joseki & Opening Explorer: Click any numbered marker (1–4) to step through 9x9 variations.',
+                `${match.boardSize}x${match.boardSize} Joseki Explorer: Click any numbered marker (1–4) to step through variations.`,
               );
             }}
           >
@@ -404,7 +416,9 @@ export default function App() {
             <aside className="control-pane">
               <div className="panel-card">
                 <div className="sensei-header">
-                  <h2>Opening Sequence Path</h2>
+                  <h2>
+                    {match.boardSize}x{match.boardSize} Opening Path
+                  </h2>
                   <span className="model-tag">
                     Move #{dojo.josekiPath.length} (
                     {dojo.josekiState.turn === BLACK ? 'Black' : 'White'} Next)
@@ -600,7 +614,12 @@ export default function App() {
 
             <aside className="control-pane">
               <div className="panel-card">
-                <h2>Curriculum Pack</h2>
+                <div className="sensei-header">
+                  <h2>Curriculum Pack</h2>
+                  <span className="model-tag">
+                    {dojo.activePuzzleSize}x{dojo.activePuzzleSize} Drills
+                  </span>
+                </div>
                 <label className="field-label">
                   Skill Module
                   <select
@@ -796,6 +815,25 @@ export default function App() {
               <div className="panel-card">
                 <h2>Dojo Setup</h2>
                 <div className="sym-grid-2">
+                  <button
+                    className={match.boardSize === 9 ? 'active' : ''}
+                    onClick={() => match.startFreshMatch({ nextBoardSize: 9 })}
+                    disabled={match.aiThinking}
+                    title="Fast tactical reading & close-quarters fighting"
+                  >
+                    9x9 Goban
+                  </button>
+                  <button
+                    className={match.boardSize === 13 ? 'active' : ''}
+                    onClick={() => match.startFreshMatch({ nextBoardSize: 13 })}
+                    disabled={match.aiThinking}
+                    title="Medium board: corners, side extensions & KataGo GPU"
+                  >
+                    13x13 Goban
+                  </button>
+                </div>
+
+                <div className="sym-grid-2 mt-10">
                   <button
                     className={match.vsAi ? 'active' : ''}
                     onClick={() => match.startFreshMatch({ nextVsAi: true })}

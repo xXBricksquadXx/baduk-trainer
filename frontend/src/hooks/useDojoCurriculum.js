@@ -8,12 +8,19 @@ import {
   fromCoordString,
 } from '../utils/goLogic';
 
-export function useDojoCurriculum({ apiBase, clearCoaching, setStatusBanner }) {
+export function useDojoCurriculum({
+  apiBase,
+  boardSize = 9,
+  clearCoaching,
+  setStatusBanner,
+}) {
   const [engineStatus, setEngineStatus] = useState('Checking engine...');
   const [puzzlePacks, setPuzzlePacks] = useState([]);
   const [activePackIdx, setActivePackIdx] = useState(0);
   const [activePuzzleIdx, setActivePuzzleIdx] = useState(0);
-  const [puzzleBoard, setPuzzleBoard] = useState(() => createInitialBoard(0));
+  const [puzzleBoard, setPuzzleBoard] = useState(() =>
+    createInitialBoard(0, 9),
+  );
   const [puzzleLastMove, setPuzzleLastMove] = useState(null);
   const [puzzleFeedback, setPuzzleFeedback] = useState(null);
   const [puzzleSolved, setPuzzleSolved] = useState(false);
@@ -53,15 +60,28 @@ export function useDojoCurriculum({ apiBase, clearCoaching, setStatusBanner }) {
         }
       })
       .catch(() => {});
-
-    fetch(`${apiBase}/joseki`)
-      .then((res) => res.json())
-      .then((data) => setJosekiData(data))
-      .catch(() => {});
   }, [apiBase]);
+
+  // Reload Joseki book matching active boardSize (9 or 13) inside async callback
+  useEffect(() => {
+    let active = true;
+    fetch(`${apiBase}/joseki?size=${boardSize}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!active) return;
+        setJosekiPath([]);
+        setJosekiData(data);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [apiBase, boardSize]);
 
   const currentPack = puzzlePacks[activePackIdx] || null;
   const currentPuzzle = currentPack?.puzzles?.[activePuzzleIdx] || null;
+  const activePuzzleSize =
+    currentPuzzle?.boardSize || currentPack?.boardSize || 9;
 
   const selectPuzzle = (pIdx, qIdx) => {
     const pack = puzzlePacks[pIdx];
@@ -86,7 +106,7 @@ export function useDojoCurriculum({ apiBase, clearCoaching, setStatusBanner }) {
       return;
     }
 
-    const coord = toCoordString(row, col);
+    const coord = toCoordString(row, col, activePuzzleSize);
     clearCoaching();
     setPuzzleBoard(res.board);
     setPuzzleLastMove({ row, col });
@@ -124,7 +144,7 @@ export function useDojoCurriculum({ apiBase, clearCoaching, setStatusBanner }) {
         setStatusBanner(`Step ${nextIdx} complete — Opponent responding...`);
 
         if (data.reply) {
-          const replyCoord = fromCoordString(data.reply);
+          const replyCoord = fromCoordString(data.reply, activePuzzleSize);
           if (replyCoord) {
             const oppColor = currentPuzzle.turn === BLACK ? WHITE : BLACK;
             setTimeout(() => {
@@ -171,11 +191,12 @@ export function useDojoCurriculum({ apiBase, clearCoaching, setStatusBanner }) {
   };
 
   const josekiState = useMemo(() => {
-    let simBoard = createInitialBoard(0);
+    const jSize = josekiData?.boardSize || boardSize;
+    let simBoard = createInitialBoard(0, jSize);
     let simTurn = BLACK;
     let lastPt = null;
     for (const node of josekiPath) {
-      const parsed = fromCoordString(node.move);
+      const parsed = fromCoordString(node.move, jSize);
       if (parsed) {
         const res = applyMove(simBoard, parsed.row, parsed.col, simTurn, null);
         if (res.valid) {
@@ -190,13 +211,13 @@ export function useDojoCurriculum({ apiBase, clearCoaching, setStatusBanner }) {
         ? josekiPath[josekiPath.length - 1]
         : josekiData?.root || {
             move: null,
-            term: 'Empty 9x9 Goban (Fuseki)',
+            term: `Empty ${jSize}x${jSize} Goban (Fuseki)`,
             summary: 'Select a starting point.',
             children: [],
           };
     const nextMarkers = (currentNode.children || [])
       .map((child, idx) => {
-        const parsed = fromCoordString(child.move);
+        const parsed = fromCoordString(child.move, jSize);
         if (!parsed) return null;
         return {
           rank: idx + 1,
@@ -215,7 +236,7 @@ export function useDojoCurriculum({ apiBase, clearCoaching, setStatusBanner }) {
       currentNode,
       nextMarkers,
     };
-  }, [josekiData, josekiPath]);
+  }, [josekiData, josekiPath, boardSize]);
 
   return {
     engineStatus,
@@ -224,6 +245,7 @@ export function useDojoCurriculum({ apiBase, clearCoaching, setStatusBanner }) {
     activePuzzleIdx,
     currentPack,
     currentPuzzle,
+    activePuzzleSize,
     puzzleBoard,
     puzzleLastMove,
     puzzleFeedback,

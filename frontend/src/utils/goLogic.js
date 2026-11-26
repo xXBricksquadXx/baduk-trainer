@@ -3,8 +3,29 @@ export const EMPTY = 0;
 export const BLACK = 1;
 export const WHITE = 2;
 
-// Standard Go column labels (skips 'I' to avoid confusion with '1' or 'J')
-export const COL_LABELS = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J'];
+// Standard Go column labels up to 19x19 (skips 'I' to avoid confusion with '1' or 'J')
+export const ALL_COL_LABELS = [
+  'A',
+  'B',
+  'C',
+  'D',
+  'E',
+  'F',
+  'G',
+  'H',
+  'J',
+  'K',
+  'L',
+  'M',
+  'N',
+  'O',
+  'P',
+  'Q',
+  'R',
+  'S',
+  'T',
+];
+export const COL_LABELS = ALL_COL_LABELS.slice(0, BOARD_SIZE);
 
 // Traditional 9x9 star-point (3-3) handicap placements: G7, C3, C7, G3
 const HANDICAP_COORDS_9X9 = [
@@ -14,17 +35,28 @@ const HANDICAP_COORDS_9X9 = [
   [6, 6], // G3
 ];
 
-export function createEmptyBoard() {
-  return Array.from({ length: BOARD_SIZE }, () =>
-    Array(BOARD_SIZE).fill(EMPTY),
-  );
+// Traditional 13x13 star-point (4-4) handicap placements: K10, D4, D10, K4
+const HANDICAP_COORDS_13X13 = [
+  [3, 9], // K10
+  [9, 3], // D4
+  [3, 3], // D10
+  [9, 9], // K4
+];
+
+export function getColLabels(boardSize = BOARD_SIZE) {
+  return ALL_COL_LABELS.slice(0, boardSize);
 }
 
-export function createInitialBoard(handicapStones = 0) {
-  const board = createEmptyBoard();
+export function createEmptyBoard(boardSize = BOARD_SIZE) {
+  return Array.from({ length: boardSize }, () => Array(boardSize).fill(EMPTY));
+}
+
+export function createInitialBoard(handicapStones = 0, boardSize = BOARD_SIZE) {
+  const board = createEmptyBoard(boardSize);
   const count = Math.max(0, Math.min(4, handicapStones));
+  const coords = boardSize === 13 ? HANDICAP_COORDS_13X13 : HANDICAP_COORDS_9X9;
   for (let i = 0; i < count; i++) {
-    const [r, c] = HANDICAP_COORDS_9X9[i];
+    const [r, c] = coords[i];
     board[r][c] = BLACK;
   }
   return board;
@@ -34,33 +66,34 @@ export function cloneBoard(board) {
   return board.map((row) => [...row]);
 }
 
-export function toCoordString(row, col) {
-  if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE)
-    return 'PASS';
-  return `${COL_LABELS[col]}${BOARD_SIZE - row}`;
+export function toCoordString(row, col, boardSize = BOARD_SIZE) {
+  if (row < 0 || row >= boardSize || col < 0 || col >= boardSize) return 'PASS';
+  return `${ALL_COL_LABELS[col]}${boardSize - row}`;
 }
 
-export function fromCoordString(coord) {
+export function fromCoordString(coord, boardSize = BOARD_SIZE) {
   if (!coord || coord.toUpperCase() === 'PASS') return null;
   const colChar = coord[0].toUpperCase();
-  const col = COL_LABELS.indexOf(colChar);
+  const labels = getColLabels(boardSize);
+  const col = labels.indexOf(colChar);
   const rowNum = parseInt(coord.slice(1), 10);
-  const row = BOARD_SIZE - rowNum;
-  if (col === -1 || Number.isNaN(row) || row < 0 || row >= BOARD_SIZE)
+  const row = boardSize - rowNum;
+  if (col === -1 || Number.isNaN(row) || row < 0 || row >= boardSize)
     return null;
   return { row, col };
 }
 
-function getNeighbors(row, col) {
+function getNeighbors(row, col, boardSize = BOARD_SIZE) {
   const neighbors = [];
   if (row > 0) neighbors.push([row - 1, col]);
-  if (row < BOARD_SIZE - 1) neighbors.push([row + 1, col]);
+  if (row < boardSize - 1) neighbors.push([row + 1, col]);
   if (col > 0) neighbors.push([row, col - 1]);
-  if (col < BOARD_SIZE - 1) neighbors.push([row, col + 1]);
+  if (col < boardSize - 1) neighbors.push([row, col + 1]);
   return neighbors;
 }
 
 export function getGroupAndLiberties(board, startRow, startCol) {
+  const size = board.length;
   const color = board[startRow][startCol];
   if (color === EMPTY) return { stones: [], liberties: 0 };
 
@@ -75,7 +108,7 @@ export function getGroupAndLiberties(board, startRow, startCol) {
     const [r, c] = stack.pop();
     stones.push([r, c]);
 
-    for (const [nr, nc] of getNeighbors(r, c)) {
+    for (const [nr, nc] of getNeighbors(r, c, size)) {
       const key = `${nr},${nc}`;
       const cell = board[nr][nc];
       if (cell === EMPTY) {
@@ -91,7 +124,8 @@ export function getGroupAndLiberties(board, startRow, startCol) {
 }
 
 export function applyMove(board, row, col, color, koPoint = null) {
-  if (row < 0 || row >= BOARD_SIZE || col < 0 || col >= BOARD_SIZE) {
+  const size = board.length;
+  if (row < 0 || row >= size || col < 0 || col >= size) {
     return { valid: false, reason: 'Out of bounds.' };
   }
   if (board[row][col] !== EMPTY) {
@@ -110,7 +144,7 @@ export function applyMove(board, row, col, color, koPoint = null) {
 
   let capturedStones = [];
 
-  for (const [nr, nc] of getNeighbors(row, col)) {
+  for (const [nr, nc] of getNeighbors(row, col, size)) {
     if (nextBoard[nr][nc] === opponent) {
       const group = getGroupAndLiberties(nextBoard, nr, nc);
       if (group.liberties === 0) {
@@ -145,12 +179,13 @@ export function applyMove(board, row, col, color, koPoint = null) {
 }
 
 export function estimateAreaScore(board, komi = 6.5) {
+  const size = board.length;
   let blackScore = 0;
   let whiteScore = komi;
   const visited = new Set();
 
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
       const cell = board[r][c];
       if (cell === BLACK) {
         blackScore += 1;
@@ -165,7 +200,7 @@ export function estimateAreaScore(board, komi = 6.5) {
         while (stack.length > 0) {
           const [cr, cc] = stack.pop();
           region.push([cr, cc]);
-          for (const [nr, nc] of getNeighbors(cr, cc)) {
+          for (const [nr, nc] of getNeighbors(cr, cc, size)) {
             const nCell = board[nr][nc];
             if (nCell === EMPTY && !visited.has(`${nr},${nc}`)) {
               visited.add(`${nr},${nc}`);
@@ -193,25 +228,13 @@ export function estimateAreaScore(board, komi = 6.5) {
   };
 }
 
-/**
- * Maps every empty intersection to:
- *   1  = Sealed Black Territory
- *   2  = Sealed White Territory
- *  -1  = Unsealed Black Sphere of Influence (early/midgame radiation)
- *  -2  = Unsealed White Sphere of Influence (early/midgame radiation)
- *   0  = Contested / Neutral
- */
 export function computeTerritoryMap(board) {
-  const territory = Array.from({ length: BOARD_SIZE }, () =>
-    Array(BOARD_SIZE).fill(0),
-  );
-  const visited = Array.from({ length: BOARD_SIZE }, () =>
-    Array(BOARD_SIZE).fill(false),
-  );
+  const size = board.length;
+  const territory = Array.from({ length: size }, () => Array(size).fill(0));
+  const visited = Array.from({ length: size }, () => Array(size).fill(false));
 
-  // 1. Pass 1: Identify 100% sealed territory regions
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
       if (board[r][c] === EMPTY && !visited[r][c]) {
         const region = [];
         const borders = new Set();
@@ -221,7 +244,7 @@ export function computeTerritoryMap(board) {
         while (stack.length > 0) {
           const [cr, cc] = stack.pop();
           region.push([cr, cc]);
-          for (const [nr, nc] of getNeighbors(cr, cc)) {
+          for (const [nr, nc] of getNeighbors(cr, cc, size)) {
             const cell = board[nr][nc];
             if (cell === EMPTY && !visited[nr][nc]) {
               visited[nr][nc] = true;
@@ -243,16 +266,13 @@ export function computeTerritoryMap(board) {
     }
   }
 
-  // 2. Pass 2: Early/Midgame Manhattan Influence Field on unsealed intersections
   const hasAnyStones = board.some((row) => row.some((cell) => cell !== EMPTY));
   if (!hasAnyStones) return territory;
 
-  const influence = Array.from({ length: BOARD_SIZE }, () =>
-    Array(BOARD_SIZE).fill(0),
-  );
+  const influence = Array.from({ length: size }, () => Array(size).fill(0));
 
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
       const stone = board[r][c];
       if (stone === EMPTY) continue;
       const sign = stone === BLACK ? 1 : -1;
@@ -263,8 +283,7 @@ export function computeTerritoryMap(board) {
           if (dist === 0 || dist > 2) continue;
           const rr = r + dr;
           const cc = c + dc;
-          if (rr >= 0 && rr < BOARD_SIZE && cc >= 0 && cc < BOARD_SIZE) {
-            // Distance 1 radiates +2, distance 2 radiates +1
+          if (rr >= 0 && rr < size && cc >= 0 && cc < size) {
             influence[rr][cc] += sign * (dist === 1 ? 2 : 1);
           }
         }
@@ -272,8 +291,8 @@ export function computeTerritoryMap(board) {
     }
   }
 
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
       if (board[r][c] === EMPTY && territory[r][c] === 0) {
         if (influence[r][c] >= 2) territory[r][c] = -BLACK;
         else if (influence[r][c] <= -2) territory[r][c] = -WHITE;
@@ -284,25 +303,19 @@ export function computeTerritoryMap(board) {
   return territory;
 }
 
-/**
- * Returns one liberty badge per connected stone group:
- * [{ row, col, color, liberties, size }]
- */
 export function computeChainLiberties(board) {
-  const visited = Array.from({ length: BOARD_SIZE }, () =>
-    Array(BOARD_SIZE).fill(false),
-  );
+  const size = board.length;
+  const visited = Array.from({ length: size }, () => Array(size).fill(false));
   const chains = [];
 
-  for (let r = 0; r < BOARD_SIZE; r++) {
-    for (let c = 0; c < BOARD_SIZE; c++) {
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
       const color = board[r][c];
       if (color !== EMPTY && !visited[r][c]) {
         const { stones, liberties } = getGroupAndLiberties(board, r, c);
         for (const [sr, sc] of stones) {
           visited[sr][sc] = true;
         }
-        // Anchor badge on the top-most / left-most stone of the chain
         const sorted = [...stones].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
         const [anchorR, anchorC] = sorted[0];
         chains.push({
@@ -318,7 +331,7 @@ export function computeChainLiberties(board) {
   return chains;
 }
 
-const SGF_ALPHA = 'abcdefghi';
+const SGF_ALPHA = 'abcdefghijklmnopqrs';
 
 function escapeSgfText(val) {
   return String(val ?? '')
@@ -337,23 +350,21 @@ function formatKyuTag(rankStr) {
   return `${num}${unit}`;
 }
 
-/**
- * Serializes current match history + player/rank/result metadata into standard 9x9 SGF.
- */
 export function exportToSgf(
   moveHistory,
   komi = 6.5,
   handicapStones = 0,
   meta = {},
+  boardSize = BOARD_SIZE,
 ) {
   const dateStr = meta.date || new Date().toISOString().slice(0, 10);
   const tags = [
     'FF[4]',
     'GM[1]',
-    'SZ[9]',
+    `SZ[${boardSize}]`,
     `KM[${komi}]`,
     `HA[${handicapStones}]`,
-    'AP[AI-Sensei-9x9]',
+    `AP[AI-Sensei-${boardSize}x${boardSize}]`,
     `DT[${dateStr}]`,
   ];
 
@@ -374,16 +385,17 @@ export function exportToSgf(
   return `(;${tags.join('')}${nodes.join('')})`;
 }
 
-/**
- * Parses a 9x9 SGF string into { moves, meta } with header tags destructured.
- */
 export function parseSgf(sgfText) {
   const extractTag = (tag) => {
     const m = sgfText.match(new RegExp(`${tag}\\[((?:\\\\.|[^\\]])*)\\]`));
     return m ? m[1].replace(/\\([\]\\])/g, '$1').trim() : null;
   };
 
+  const parsedSize = extractTag('SZ') ? parseInt(extractTag('SZ'), 10) : 9;
+  const boardSize = parsedSize === 13 ? 13 : 9;
+
   const meta = {
+    boardSize,
     blackName: extractTag('PB') || 'Black',
     whiteName: extractTag('PW') || 'White',
     blackRank: extractTag('BR') || '',
@@ -395,7 +407,7 @@ export function parseSgf(sgfText) {
   };
 
   const moves = [];
-  const tokenRegex = /;([BW])\[([a-i]{0,2})\]/gi;
+  const tokenRegex = /;([BW])\[([a-s]{0,2})\]/gi;
   let match;
   while ((match = tokenRegex.exec(sgfText)) !== null) {
     const color = match[1].toUpperCase() === 'B' ? BLACK : WHITE;
@@ -403,8 +415,13 @@ export function parseSgf(sgfText) {
     if (raw.length === 2) {
       const col = SGF_ALPHA.indexOf(raw[0]);
       const row = SGF_ALPHA.indexOf(raw[1]);
-      if (row >= 0 && row < BOARD_SIZE && col >= 0 && col < BOARD_SIZE) {
-        moves.push({ color, row, col, coord: toCoordString(row, col) });
+      if (row >= 0 && row < boardSize && col >= 0 && col < boardSize) {
+        moves.push({
+          color,
+          row,
+          col,
+          coord: toCoordString(row, col, boardSize),
+        });
       }
     } else {
       moves.push({ color, row: -1, col: -1, coord: 'PASS' });
@@ -414,7 +431,6 @@ export function parseSgf(sgfText) {
   return { moves, meta };
 }
 
-// Backward-compatible alias
 export function parseSgfMoves(sgfText) {
   return parseSgf(sgfText).moves;
 }

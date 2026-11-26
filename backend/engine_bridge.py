@@ -19,8 +19,7 @@ from katago_gtp import is_katago_ready, katago_session
 
 ENGINE_DIR = Path(__file__).parent / "engine"
 
-# Strategic positional priors for 9x9 (rewards 3-3/3-4/4-4 points & center tengen, penalizes 1st-line crawls)
-POSITION_WEIGHTS = [
+POSITION_WEIGHTS_9X9 = [
     [0.1, 0.3, 0.5, 0.5, 0.5, 0.5, 0.5, 0.3, 0.1],
     [0.3, 0.7, 1.0, 1.0, 1.0, 1.0, 1.0, 0.7, 0.3],
     [0.5, 1.0, 1.5, 1.3, 1.3, 1.3, 1.5, 1.0, 0.5],
@@ -33,6 +32,20 @@ POSITION_WEIGHTS = [
 ]
 
 
+def _positional_prior(size: int, row: int, col: int) -> float:
+    if size == 9:
+        return POSITION_WEIGHTS_9X9[row][col]
+    # Dynamic 13x13 prior: favors 3rd/4th line corners and sides, penalizes 1st/2nd line early
+    edge_dist = min(row, size - 1 - row, col, size - 1 - col)
+    if edge_dist == 0:
+        return 0.1
+    if edge_dist == 1:
+        return 0.4
+    if edge_dist in (2, 3):
+        return 1.45
+    return 1.2
+
+
 def detect_engine_backend() -> str:
     gnugo_bin = ENGINE_DIR / "gnugo.exe"
     if is_katago_ready():
@@ -43,7 +56,7 @@ def detect_engine_backend() -> str:
 
 
 def _should_use_katago(rank: str, board_size: int = BOARD_SIZE) -> bool:
-    """Routes 3k, 1d+, and 13x13 boards to KataGo GPU while keeping 30k-6k on Python MCTS."""
+    """Routes 3k, 1d+, and 13x13 boards to KataGo GPU while keeping 30k-6k 9x9 on Python MCTS."""
     if not is_katago_ready():
         return False
     if board_size > 9:
@@ -92,8 +105,8 @@ def rank_label_to_strength(rank: str) -> Dict[str, Any]:
 
 
 def _is_true_eye(board: List[List[int]], row: int, col: int, color: int) -> bool:
-    """Prevents AI from filling its own single-point eyes unless capturing."""
-    for nr, nc in get_neighbors(row, col):
+    size = len(board)
+    for nr, nc in get_neighbors(row, col, size):
         if board[nr][nc] != color:
             return False
     diag_friendly = 0
@@ -101,7 +114,7 @@ def _is_true_eye(board: List[List[int]], row: int, col: int, color: int) -> bool
     for dr in (-1, 1):
         for dc in (-1, 1):
             rr, cc = row + dr, col + dc
-            if 0 <= rr < BOARD_SIZE and 0 <= cc < BOARD_SIZE:
+            if 0 <= rr < size and 0 <= cc < size:
                 diag_total += 1
                 if board[rr][cc] == color:
                     diag_friendly += 1
@@ -109,22 +122,22 @@ def _is_true_eye(board: List[List[int]], row: int, col: int, color: int) -> bool
 
 
 def _all_borders_sealed(board: List[List[int]]) -> bool:
-    """Returns True when every empty region on the board touches only ONE stone color (zero neutral dame)."""
+    size = len(board)
     has_black = any(cell == BLACK for row in board for cell in row)
     has_white = any(cell == WHITE for row in board for cell in row)
     if not (has_black and has_white):
         return False
 
     visited = set()
-    for r in range(BOARD_SIZE):
-        for c in range(BOARD_SIZE):
+    for r in range(size):
+        for c in range(size):
             if board[r][c] == EMPTY and (r, c) not in visited:
                 borders = set()
                 stack = [(r, c)]
                 visited.add((r, c))
                 while stack:
                     cr, cc = stack.pop()
-                    for nr, nc in get_neighbors(cr, cc):
+                    for nr, nc in get_neighbors(cr, cc, size):
                         cell = board[nr][nc]
                         if cell == EMPTY and (nr, nc) not in visited:
                             visited.add((nr, nc))
@@ -143,7 +156,7 @@ def _evaluate_tactical_move(
     color: int,
     ko_point: Optional[Tuple[int, int]],
 ) -> Tuple[float, List[str]]:
-    """Scores a legal move using tactical Go principles and returns reason tags."""
+    size = len(board)
     res = apply_move(board, row, col, color, ko_point)
     if not res["valid"]:
         return (-999.0, [])
@@ -151,25 +164,22 @@ def _evaluate_tactical_move(
     next_board = res["board"]
     opponent = WHITE if color == BLACK else BLACK
     tags: List[str] = []
-    score = POSITION_WEIGHTS[row][col]
+    score = _positional_prior(size, row, col)
 
-    # 1. Capture bonus
     if res["captured_count"] > 0:
         score += 4.5 * res["captured_count"]
         tags.append(f"captures {res['captured_count']} stone(s)")
 
-    # 2. Avoid filling own eye
     if _is_true_eye(board, row, col, color) and res["captured_count"] == 0:
         score -= 8.0
         tags.append("fills own eye")
 
-    # 3. Check self-group liberties (guard against hopeless throw-ins & 2-liberty chains)
     self_stones, self_libs = get_group_and_liberties(next_board, row, col)
     if self_libs == 1 and res["captured_count"] == 0:
         can_capture_next = any(
             next_board[nr][nc] == opponent
             and get_group_and_liberties(next_board, nr, nc)[1] == 1
-            for nr, nc in get_neighbors(row, col)
+            for nr, nc in get_neighbors(row, col, size)
         )
         if not can_capture_next:
             score -= 9.5 + 1.2 * len(self_stones)
@@ -182,7 +192,7 @@ def _evaluate_tactical_move(
         tags.append("low-liberty group risk")
     elif self_libs >= 3:
         score += 0.6
-        for nr, nc in get_neighbors(row, col):
+        for nr, nc in get_neighbors(row, col, size):
             if board[nr][nc] == color:
                 old_stones, old_libs = get_group_and_liberties(board, nr, nc)
                 if old_libs == 2 and len(old_stones) >= 2:
@@ -190,8 +200,7 @@ def _evaluate_tactical_move(
                     tags.append("extends 2-liberty group")
                     break
 
-    # 4. Check if move puts adjacent enemy groups into Atari (1 liberty) or reduces liberties
-    for nr, nc in get_neighbors(row, col):
+    for nr, nc in get_neighbors(row, col, size):
         if next_board[nr][nc] == opponent:
             opp_stones, opp_libs = get_group_and_liberties(next_board, nr, nc)
             if opp_libs == 1:
@@ -206,14 +215,12 @@ def _evaluate_tactical_move(
                 score += 3.5
                 tags.append("defends group in atari")
 
-    # 5. Opening positional tags
     move_count = sum(1 for r in board for c in r if c != EMPTY)
     if move_count < 10:
-        if (row, col) == (4, 4):
+        center = size // 2
+        if (row, col) == (center, center):
             tags.append("controls center (tengen)")
-        elif (row, col) in {(2, 2), (2, 6), (6, 2), (6, 6)}:
-            tags.append("occupies 3-3 corner star point")
-        elif row in {0, 8} or col in {0, 8}:
+        elif row in {0, size - 1} or col in {0, size - 1}:
             tags.append("first-line edge play (low territory)")
 
     if not tags:
@@ -228,7 +235,7 @@ def _quick_rollout(
     ko_point: Optional[Tuple[int, int]],
     max_steps: int = 38,
 ) -> float:
-    """Tactically-biased playout returning +1 if `turn` wins, 0 otherwise."""
+    size = len(board)
     sim_board = [r[:] for r in board]
     curr = turn
     ko = ko_point
@@ -241,13 +248,13 @@ def _quick_rollout(
 
         if last_pt is not None:
             lr, lc = last_pt
-            local_targets = [(lr, lc)] + get_neighbors(lr, lc)
+            local_targets = [(lr, lc)] + get_neighbors(lr, lc, size)
             for tr, tc in local_targets:
                 if sim_board[tr][tc] != EMPTY:
                     stones, libs = get_group_and_liberties(sim_board, tr, tc)
                     if libs == 1:
                         for sr, sc in stones:
-                            for nr, nc in get_neighbors(sr, sc):
+                            for nr, nc in get_neighbors(sr, sc, size):
                                 if sim_board[nr][nc] == EMPTY and not _is_true_eye(
                                     sim_board, nr, nc, curr
                                 ):
@@ -263,8 +270,8 @@ def _quick_rollout(
 
         if chosen_res is None:
             for _attempt in range(14):
-                r = random.randrange(BOARD_SIZE)
-                c = random.randrange(BOARD_SIZE)
+                r = random.randrange(size)
+                c = random.randrange(size)
                 if sim_board[r][c] == EMPTY and not _is_true_eye(sim_board, r, c, curr):
                     res = apply_move(sim_board, r, c, curr, ko)
                     if res["valid"]:
@@ -297,14 +304,13 @@ def evaluate_candidates(
     rank: str = "15k",
     top_k: int = 4,
 ) -> List[Dict[str, Any]]:
-    # Hybrid path: use KataGo GPU for 3k/1d+ and 13x13 candidate analysis
-    if _should_use_katago(rank, len(board)):
+    size = len(board)
+    if _should_use_katago(rank, size):
         try:
             kg_hints = katago_session.analyze_position(
                 board, color, rank=rank, top_k=top_k
             )
             if kg_hints:
-                # Filter out any illegal Ko recapture just in case
                 valid_kg = []
                 for h in kg_hints:
                     if h["move"] == "PASS":
@@ -318,7 +324,7 @@ def evaluate_candidates(
                         item["rank"] = idx
                     return valid_kg[:top_k]
         except Exception:
-            pass  # Fall back seamlessly to Python MCTS
+            pass
 
     profile = rank_label_to_strength(rank)
     legal = get_legal_moves(board, color, ko_point)
@@ -368,7 +374,7 @@ def evaluate_candidates(
             {
                 "row": r,
                 "col": c,
-                "move": to_coord(r, c),
+                "move": to_coord(r, c, size),
                 "winrate": round(max(0.02, min(0.98, blended_wr)) * 100, 1),
                 "scoreLead": round((blended_wr - 0.5) * 18.0, 1),
                 "tags": final_tags,
@@ -390,6 +396,7 @@ def choose_ai_move(
     ko_point: Optional[Tuple[int, int]] = None,
     rank: str = "15k",
 ) -> Dict[str, Any]:
+    size = len(board)
     stone_count = sum(1 for r in board for c in r if c != EMPTY)
     if _all_borders_sealed(board):
         return {
@@ -400,8 +407,7 @@ def choose_ai_move(
             "tags": ["all borders sealed — endgame pass"],
         }
 
-    # Hybrid path: KataGo GPU handles 3k, 1d+, and 13x13 matches
-    if _should_use_katago(rank, len(board)):
+    if _should_use_katago(rank, size):
         try:
             kg_choice = katago_session.genmove(board, color, rank=rank)
             if kg_choice is not None:
@@ -413,7 +419,7 @@ def choose_ai_move(
                 if chk["valid"]:
                     return kg_choice
         except Exception:
-            pass  # Fall back seamlessly to Python MCTS
+            pass
 
     candidates = evaluate_candidates(board, color, ko_point, rank=rank, top_k=5)
     if not candidates:
@@ -425,7 +431,8 @@ def choose_ai_move(
             "tags": ["no legal moves"],
         }
 
-    if stone_count > 52 and "fills own eye" in candidates[0]["tags"]:
+    pass_threshold = 115 if size == 13 else 52
+    if stone_count > pass_threshold and "fills own eye" in candidates[0]["tags"]:
         return {
             "move": "PASS",
             "row": -1,

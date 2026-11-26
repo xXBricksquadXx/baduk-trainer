@@ -28,8 +28,9 @@ export function useMatchEngine({
   onSwitchToMatchTab,
   onSgfImported,
 }) {
+  const [boardSize, setBoardSize] = useState(9);
   const [handicapId, setHandicapId] = useState('even');
-  const [board, setBoard] = useState(() => createInitialBoard(0));
+  const [board, setBoard] = useState(() => createInitialBoard(0, 9));
   const [currentTurn, setCurrentTurn] = useState(BLACK);
   const [captures, setCaptures] = useState({ [BLACK]: 0, [WHITE]: 0 });
   const [koPoint, setKoPoint] = useState(null);
@@ -193,17 +194,19 @@ export function useMatchEngine({
       nextVsAi = vsAi,
       nextHumanColor = humanColor,
       nextHandicapId = handicapId,
+      nextBoardSize = boardSize,
     } = {}) => {
       const hSpec =
         HANDICAP_OPTIONS.find((h) => h.id === nextHandicapId) ||
         HANDICAP_OPTIONS[0];
-      const freshBoard = createInitialBoard(hSpec.stones);
+      const freshBoard = createInitialBoard(hSpec.stones, nextBoardSize);
       const firstTurn = hSpec.stones >= 2 ? WHITE : BLACK;
       const freshCaptures = { [BLACK]: 0, [WHITE]: 0 };
 
       clearCoaching();
       setSgfMeta(null);
-      setLastEngineUsed(null);
+      setLastEngineUsed(nextBoardSize === 13 ? 'KataGo GPU' : null);
+      setBoardSize(nextBoardSize);
       setVsAi(nextVsAi);
       setHumanColor(nextHumanColor);
       setHandicapId(nextHandicapId);
@@ -230,7 +233,7 @@ export function useMatchEngine({
         );
       } else {
         setStatusBanner(
-          `${firstTurn === BLACK ? 'Black' : 'White'} to play (${hSpec.label}).`,
+          `${nextBoardSize}x${nextBoardSize} — ${firstTurn === BLACK ? 'Black' : 'White'} to play (${hSpec.label}).`,
         );
       }
     },
@@ -238,6 +241,7 @@ export function useMatchEngine({
       vsAi,
       humanColor,
       handicapId,
+      boardSize,
       clearCoaching,
       triggerAiTurn,
       setStatusBanner,
@@ -254,7 +258,7 @@ export function useMatchEngine({
       return;
     }
 
-    const coord = toCoordString(row, col);
+    const coord = toCoordString(row, col, boardSize);
     const updatedCaptures = {
       ...captures,
       [currentTurn]: captures[currentTurn] + result.capturedCount,
@@ -433,15 +437,18 @@ export function useMatchEngine({
       activeHandicap.komi,
       activeHandicap.stones,
       meta,
+      boardSize,
     );
     const blob = new Blob([sgf], { type: 'application/x-go-sgf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `ai-sensei-9x9-move-${moveHistory.length}.sgf`;
+    a.download = `ai-sensei-${boardSize}x${boardSize}-move-${moveHistory.length}.sgf`;
     a.click();
     URL.revokeObjectURL(url);
-    setStatusBanner(`Exported ${moveHistory.length}-move game to SGF.`);
+    setStatusBanner(
+      `Exported ${moveHistory.length}-move (${boardSize}x${boardSize}) game to SGF.`,
+    );
   };
 
   const handleImportSgfFile = (e) => {
@@ -450,11 +457,12 @@ export function useMatchEngine({
     const reader = new FileReader();
     reader.onload = () => {
       const { moves: parsed, meta } = parseSgf(String(reader.result || ''));
+      const importedSize = meta.boardSize === 13 ? 13 : 9;
       if (parsed.length === 0) {
-        setStatusBanner('No valid 9x9 moves found in SGF file.');
+        setStatusBanner('No valid 9x9 or 13x13 moves found in SGF file.');
         return;
       }
-      let simBoard = createInitialBoard(meta.handicap || 0);
+      let simBoard = createInitialBoard(meta.handicap || 0, importedSize);
       let simTurn = (meta.handicap || 0) >= 2 ? WHITE : BLACK;
       let simKo = null;
       const simCaps = { [BLACK]: 0, [WHITE]: 0 };
@@ -516,6 +524,7 @@ export function useMatchEngine({
       const resNote = meta.result ? ` • Result: ${meta.result}` : '';
 
       clearCoaching();
+      setBoardSize(importedSize);
       setVsAi(false);
       setSgfMeta(meta);
       setLastEngineUsed(null);
@@ -529,7 +538,7 @@ export function useMatchEngine({
       onSwitchToMatchTab();
       onSgfImported?.();
       setStatusBanner(
-        `Loaded ${file.name}: ${bHeader} vs ${wHeader}${resNote} (${rebuiltHistory.length} moves — 3B Sensei Review active).`,
+        `Loaded ${file.name} (${importedSize}x${importedSize}): ${bHeader} vs ${wHeader}${resNote} (${rebuiltHistory.length} moves — 3B Sensei Review active).`,
       );
     };
     reader.readAsText(file);
@@ -537,6 +546,7 @@ export function useMatchEngine({
   };
 
   return {
+    boardSize,
     handicapId,
     activeHandicap,
     board,

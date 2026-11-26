@@ -1,0 +1,111 @@
+{
+  "title": "13x13 Corner & Side Joseki Explorer",
+  "boardSize": 13,
+  "root": {
+    "move": null,
+    "term": "Empty 13x13 Goban (Fuseki)",
+    "summary": "On 13x13, corners come first, followed by side extensions along the 3rd/4th lines. Unlike 9x9, you cannot fight everywhere at once — build balanced corner-plus-side frameworks.",
+    "children": [
+      {
+        "move": "D4",
+        "term": "Komoku (3-4 Point)",
+        "summary": "Territory-oriented corner opening. Faces one side faster than 4-4 and invites the opponent to approach on the open side.",
+        "children": [
+          {
+            "move": "F3",
+            "term": "Keima Approach (Knight's Approach)",
+            "summary": "White approaches Black's 3-4 stone low on the 3rd line, aiming to slide into the corner or establish a side base.",
+            "children": [
+              {
+                "move": "D6",
+                "term": "Kosumi (Diagonal Corner Enclosure)",
+                "summary": "Black secures the corner solidly while White settles along the bottom side — a classic peaceful 13x13 joseki.",
+                "children": [
+                  {
+                    "move": "J3",
+                    "term": "Two-Space Base Extension",
+                    "summary": "White extends two spaces along the 3rd line to make a living eye-shape base."
+                  }
+                ]
+              },
+              {
+                "move": "H3",
+                "term": "Two-Space Low Pincer",
+                "summary": "Black pinches White's approach stone, denying an easy side base and starting a corner-vs-center fight.",
+                "children": [
+                  {
+                    "move": "D6",
+                    "term": "Counter-Approach",
+                    "summary": "White counter-attacks Black's corner from the left side instead of running straight out."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "move": "F4",
+            "term": "Takamoku Approach (High Knight's Approach)",
+            "summary": "White approaches on the 4th line to prioritize center influence (moyo) over 3rd-line territory.",
+            "children": [
+              {
+                "move": "D6",
+                "term": "Solid Corner Protection",
+                "summary": "Black takes the corner cash while White builds an outward-facing wall."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "move": "K10",
+        "term": "Hoshi (4-4 Star Point)",
+        "summary": "Balanced influence + speed. Controls the corner in one move while radiating power toward both adjacent sides and the center.",
+        "children": [
+          {
+            "move": "L11",
+            "term": "San-San Invasion (3-3 Under 4-4)",
+            "summary": "White dives directly into the 3-3 point under Black's 4-4 stone to steal corner territory.",
+            "children": [
+              {
+                "move": "K11",
+                "term": "Inside Block",
+                "summary": "Black blocks on the wider side to build an outer wall while White lives inside the corner.",
+                "children": [
+                  {
+                    "move": "L10",
+                    "term": "Hane & Extension",
+                    "summary": "White turns along the 3rd line to guarantee two eyes; Black gets thick outside influence."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "move": "H10",
+            "term": "Knight's Approach to 4-4",
+            "summary": "White approaches Black's 4-4 corner from the top side at a 2-space knight's interval.",
+            "children": [
+              {
+                "move": "K8",
+                "term": "One-Space Low Jump (Shimari)",
+                "summary": "Black defends the right side and corner simultaneously with a flexible one-space jump."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "move": "K4",
+        "term": "Cross-Corner Hoshi (4-4)",
+        "summary": "Playing opposite corners (D4 + K4 or D10 + K4) creates a dynamic Nirensei or cross-fuseki game.",
+        "children": [
+          {
+            "move": "D10",
+            "term": "Counter-Corner Claim",
+            "summary": "White claims the remaining open corner before side extensions begin."
+          }
+        ]
+      }
+    ]
+  }
+}

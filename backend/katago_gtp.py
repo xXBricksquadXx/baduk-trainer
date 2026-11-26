@@ -137,16 +137,15 @@ class KataGoSession:
         for r in range(size):
             for c in range(size):
                 if board[r][c] == BLACK:
-                    black_stones.append(to_coord(r, c))
+                    black_stones.append(to_coord(r, c, size))
                 elif board[r][c] == WHITE:
-                    white_stones.append(to_coord(r, c))
+                    white_stones.append(to_coord(r, c, size))
 
         if black_stones:
             self._send_locked(
                 f"set_position {' '.join('B ' + s for s in black_stones)}"
             )
         if white_stones:
-            # KataGo supports incremental set_position or play commands; use play for White after B
             for ws in white_stones:
                 self._send_locked(f"play W {ws}")
         return size
@@ -161,6 +160,7 @@ class KataGoSession:
     ) -> List[Dict[str, Any]]:
         if not self.start():
             return []
+        size = len(board)
         visits = _rank_to_visits(rank)
         gtp_color = "B" if color == BLACK else "W"
 
@@ -189,7 +189,6 @@ class KataGoSession:
                 s = line.strip()
                 if s.startswith("info move "):
                     info_line = s
-                    # Stop analysis as soon as KataGo reaches target visits
                     m_visits = re.search(r"visits\s+(\d+)", s)
                     if m_visits and int(m_visits.group(1)) >= max(2, visits // 2):
                         self._proc.stdin.write("\n")
@@ -208,7 +207,7 @@ class KataGoSession:
             if move_str == "PASS":
                 rc: Optional[Tuple[int, int]] = (-1, -1)
             else:
-                rc = from_coord(move_str)
+                rc = from_coord(move_str, size)
             if rc is None:
                 continue
 
@@ -241,6 +240,7 @@ class KataGoSession:
     ) -> Optional[Dict[str, Any]]:
         if not self.start():
             return None
+        size = len(board)
         visits = _rank_to_visits(rank)
         gtp_color = "B" if color == BLACK else "W"
 
@@ -260,7 +260,7 @@ class KataGoSession:
                 "winrate": 50.0,
                 "tags": ["KataGo GPU endgame pass"],
             }
-        rc = from_coord(move_raw)
+        rc = from_coord(move_raw, size)
         if rc is None:
             return None
         return {

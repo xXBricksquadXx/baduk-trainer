@@ -1,12 +1,24 @@
 import { useState } from 'react';
-import { BOARD_SIZE, BLACK, WHITE, EMPTY, COL_LABELS } from '../utils/goLogic';
+import { BLACK, WHITE, EMPTY, getColLabels } from '../utils/goLogic';
 
-const STAR_POINTS = [
+const STAR_POINTS_9X9 = [
   [2, 2],
   [2, 6],
   [4, 4],
   [6, 2],
   [6, 6],
+];
+
+const STAR_POINTS_13X13 = [
+  [3, 3],
+  [3, 6],
+  [3, 9],
+  [6, 3],
+  [6, 6],
+  [6, 9],
+  [9, 3],
+  [9, 6],
+  [9, 9],
 ];
 
 export default function Goban9x9({
@@ -26,11 +38,17 @@ export default function Goban9x9({
 }) {
   const [hoverCell, setHoverCell] = useState(null);
 
-  const cellSize = 64;
-  const padding = 48;
-  const gridSpan = (BOARD_SIZE - 1) * cellSize;
+  const boardSize = board?.length || 9;
+  const colLabels = getColLabels(boardSize);
+  const starPoints = boardSize === 13 ? STAR_POINTS_13X13 : STAR_POINTS_9X9;
+
+  // Keep consistent outer SVG canvas (~608px) while scaling grid spacing for 9x9 vs 13x13
+  const padding = boardSize === 13 ? 42 : 48;
+  const gridSpan = 512;
+  const cellSize = gridSpan / (boardSize - 1);
   const totalSize = gridSpan + padding * 2;
   const stoneRadius = cellSize * 0.45;
+  const scaleFactor = cellSize / 64;
 
   const getXY = (row, col) => ({
     x: padding + col * cellSize,
@@ -46,7 +64,7 @@ export default function Goban9x9({
         viewBox={`0 0 ${totalSize} ${totalSize}`}
         className="goban-svg"
         role="img"
-        aria-label="9x9 Go Board"
+        aria-label={`${boardSize}x${boardSize} Go Board`}
       >
         <defs>
           <radialGradient id="blackStoneGrad" cx="35%" cy="30%" r="65%">
@@ -82,15 +100,15 @@ export default function Goban9x9({
         />
 
         {/* Coordinate Labels */}
-        {COL_LABELS.map((label, colIdx) => {
+        {colLabels.map((label, colIdx) => {
           const x = padding + colIdx * cellSize;
           return (
             <g key={`col-${label}`} className="coord-label">
               <text
                 x={x}
-                y={22}
+                y={21}
                 textAnchor="middle"
-                fontSize="13"
+                fontSize={boardSize === 13 ? '11.5' : '13'}
                 fontWeight="600"
                 fill="#4e3612"
               >
@@ -98,9 +116,9 @@ export default function Goban9x9({
               </text>
               <text
                 x={x}
-                y={totalSize - 14}
+                y={totalSize - 13}
                 textAnchor="middle"
-                fontSize="13"
+                fontSize={boardSize === 13 ? '11.5' : '13'}
                 fontWeight="600"
                 fill="#4e3612"
               >
@@ -110,26 +128,26 @@ export default function Goban9x9({
           );
         })}
 
-        {Array.from({ length: BOARD_SIZE }).map((_, rowIdx) => {
+        {Array.from({ length: boardSize }).map((_, rowIdx) => {
           const y = padding + rowIdx * cellSize + 4;
-          const rowLabel = BOARD_SIZE - rowIdx;
+          const rowLabel = boardSize - rowIdx;
           return (
             <g key={`row-${rowLabel}`} className="coord-label">
               <text
-                x={20}
+                x={19}
                 y={y}
                 textAnchor="middle"
-                fontSize="13"
+                fontSize={boardSize === 13 ? '11.5' : '13'}
                 fontWeight="600"
                 fill="#4e3612"
               >
                 {rowLabel}
               </text>
               <text
-                x={totalSize - 20}
+                x={totalSize - 19}
                 y={y}
                 textAnchor="middle"
-                fontSize="13"
+                fontSize={boardSize === 13 ? '11.5' : '13'}
                 fontWeight="600"
                 fill="#4e3612"
               >
@@ -140,7 +158,7 @@ export default function Goban9x9({
         })}
 
         {/* Grid Lines */}
-        {Array.from({ length: BOARD_SIZE }).map((_, idx) => {
+        {Array.from({ length: boardSize }).map((_, idx) => {
           const pos = padding + idx * cellSize;
           return (
             <g key={`grid-${idx}`}>
@@ -150,7 +168,7 @@ export default function Goban9x9({
                 x2={padding + gridSpan}
                 y2={pos}
                 stroke="#2b1d08"
-                strokeWidth={idx === 0 || idx === BOARD_SIZE - 1 ? 2 : 1.25}
+                strokeWidth={idx === 0 || idx === boardSize - 1 ? 2 : 1.2}
               />
               <line
                 x1={pos}
@@ -158,21 +176,21 @@ export default function Goban9x9({
                 x2={pos}
                 y2={padding + gridSpan}
                 stroke="#2b1d08"
-                strokeWidth={idx === 0 || idx === BOARD_SIZE - 1 ? 2 : 1.25}
+                strokeWidth={idx === 0 || idx === boardSize - 1 ? 2 : 1.2}
               />
             </g>
           );
         })}
 
         {/* Star Points (Hoshi) */}
-        {STAR_POINTS.map(([r, c]) => {
+        {starPoints.map(([r, c]) => {
           const { x, y } = getXY(r, c);
           return (
             <circle
               key={`hoshi-${r}-${c}`}
               cx={x}
               cy={y}
-              r="4.2"
+              r={boardSize === 13 ? '3.6' : '4.2'}
               fill="#2b1d08"
             />
           );
@@ -182,40 +200,40 @@ export default function Goban9x9({
         {territoryMap &&
           territoryMap.map((rowArr, r) =>
             rowArr.map((owner, c) => {
-              if (owner === 0 || board[r][c] !== EMPTY) return null;
+              if (owner === 0 || board[r]?.[c] !== EMPTY) return null;
               const { x, y } = getXY(r, c);
 
-              // Sealed territory (1 = Black, 2 = White)
               if (owner === BLACK || owner === WHITE) {
                 const isB = owner === BLACK;
+                const boxSize = Math.round(22 * scaleFactor);
+                const half = boxSize / 2;
                 return (
                   <rect
                     key={`terr-${r}-${c}`}
-                    x={x - 11}
-                    y={y - 11}
-                    width="22"
-                    height="22"
-                    rx="4"
+                    x={x - half}
+                    y={y - half}
+                    width={boxSize}
+                    height={boxSize}
+                    rx="3.5"
                     fill={
                       isB
                         ? 'rgba(15, 17, 21, 0.72)'
                         : 'rgba(255, 255, 255, 0.85)'
                     }
                     stroke={isB ? '#eab308' : '#334155'}
-                    strokeWidth="1.5"
+                    strokeWidth="1.4"
                     pointerEvents="none"
                   />
                 );
               }
 
-              // Early/midgame sphere of influence (-1 = Black, -2 = White)
               const isBInf = owner === -BLACK;
               return (
                 <circle
                   key={`inf-${r}-${c}`}
                   cx={x}
                   cy={y}
-                  r="6.5"
+                  r={Math.max(4.5, 6.5 * scaleFactor)}
                   fill={
                     isBInf
                       ? 'rgba(15, 17, 21, 0.42)'
@@ -237,12 +255,13 @@ export default function Goban9x9({
         {koPoint &&
           (() => {
             const { x, y } = getXY(koPoint.row, koPoint.col);
+            const s = 14 * scaleFactor;
             return (
               <rect
-                x={x - 7}
-                y={y - 7}
-                width="14"
-                height="14"
+                x={x - s / 2}
+                y={y - s / 2}
+                width={s}
+                height={s}
                 fill="none"
                 stroke="#b91c1c"
                 strokeWidth="2"
@@ -286,7 +305,7 @@ export default function Goban9x9({
                     r={stoneRadius * 0.36}
                     fill="none"
                     stroke={cell === BLACK ? '#fbbf24' : '#dc2626'}
-                    strokeWidth={isAbsoluteLast ? '2.8' : '1.6'}
+                    strokeWidth={isAbsoluteLast ? '2.5' : '1.5'}
                     opacity={isAbsoluteLast ? 1 : 0.45}
                   />
                 )}
@@ -298,8 +317,10 @@ export default function Goban9x9({
         {/* Toggleable Chain Liberties Badges */}
         {chainLiberties.map((ch) => {
           const { x, y } = getXY(ch.row, ch.col);
-          const dx = ch.col === BOARD_SIZE - 1 ? -14 : 14;
-          const dy = ch.row === 0 ? 14 : -14;
+          const offset = 14 * scaleFactor;
+          const dx = ch.col === boardSize - 1 ? -offset : offset;
+          const dy = ch.row === 0 ? offset : -offset;
+          const badgeR = Math.max(8, 10.5 * scaleFactor);
           const badgeBg =
             ch.liberties === 1
               ? '#dc2626'
@@ -319,14 +340,14 @@ export default function Goban9x9({
               transform={`translate(${x + dx}, ${y + dy})`}
             >
               <circle
-                r="10.5"
+                r={badgeR}
                 fill={badgeBg}
                 stroke={badgeStroke}
-                strokeWidth="1.6"
+                strokeWidth="1.5"
               />
               <text
-                y="3.8"
-                fontSize="11"
+                y={3.2 * scaleFactor}
+                fontSize={Math.max(9, 11 * scaleFactor)}
                 fontWeight="800"
                 fill="#ffffff"
                 textAnchor="middle"
@@ -367,13 +388,13 @@ export default function Goban9x9({
                       ? '#22c55e'
                       : '#f59e0b'
                 }
-                strokeWidth={isSelected ? '3.5' : '2.2'}
+                strokeWidth={isSelected ? '3.2' : '2'}
               />
               <text
                 x={x}
-                y={y + 5}
+                y={y + 4.5 * scaleFactor}
                 textAnchor="middle"
-                fontSize="15"
+                fontSize={Math.max(12, 15 * scaleFactor)}
                 fontWeight="700"
                 fill={currentTurn === BLACK ? '#ffffff' : '#111827'}
               >
@@ -386,7 +407,7 @@ export default function Goban9x9({
         {/* Hover Preview Stone */}
         {!disabled &&
           hoverCell &&
-          board[hoverCell.row][hoverCell.col] === EMPTY &&
+          board[hoverCell.row]?.[hoverCell.col] === EMPTY &&
           !hintMap.has(`${hoverCell.row},${hoverCell.col}`) &&
           !(
             koPoint &&
@@ -411,8 +432,8 @@ export default function Goban9x9({
           })()}
 
         {/* Invisible Interactive Hitboxes */}
-        {Array.from({ length: BOARD_SIZE }).map((_, r) =>
-          Array.from({ length: BOARD_SIZE }).map((__, c) => {
+        {Array.from({ length: boardSize }).map((_, r) =>
+          Array.from({ length: boardSize }).map((__, c) => {
             const { x, y } = getXY(r, c);
             const hint = hintMap.get(`${r},${c}`);
             return (

@@ -2,7 +2,6 @@ import logging
 import httpx
 from typing import List, Dict, Any, Optional
 from go_rules import (
-    BOARD_SIZE,
     EMPTY,
     BLACK,
     WHITE,
@@ -21,12 +20,13 @@ FAST_FALLBACK_MODEL = "qwen2.5-coder:3b"
 
 
 def render_ascii_board(board: List[List[int]]) -> str:
-    header = "   " + " ".join(COL_LABELS)
+    size = len(board)
+    header = "   " + " ".join(COL_LABELS[:size])
     lines = [header]
-    for r in range(BOARD_SIZE):
-        row_label = str(BOARD_SIZE - r)
+    for r in range(size):
+        row_label = str(size - r)
         cells = []
-        for c in range(BOARD_SIZE):
+        for c in range(size):
             v = board[r][c]
             cells.append("X" if v == BLACK else ("O" if v == WHITE else "."))
         lines.append(f"{row_label:>2} " + " ".join(cells))
@@ -34,19 +34,20 @@ def render_ascii_board(board: List[List[int]]) -> str:
 
 
 def scan_board_tactics(board: List[List[int]]) -> Dict[str, List[str]]:
+    size = len(board)
     visited = set()
     black_atari: List[str] = []
     white_atari: List[str] = []
 
-    for r in range(BOARD_SIZE):
-        for c in range(BOARD_SIZE):
+    for r in range(size):
+        for c in range(size):
             color = board[r][c]
             if color != EMPTY and (r, c) not in visited:
                 stones, libs = get_group_and_liberties(board, r, c)
                 for sr, sc in stones:
                     visited.add((sr, sc))
                 if libs == 1:
-                    rep = f"{to_coord(r, c)} ({len(stones)}-stone group)"
+                    rep = f"{to_coord(r, c, size)} ({len(stones)}-stone group)"
                     if color == BLACK:
                         black_atari.append(rep)
                     else:
@@ -56,28 +57,29 @@ def scan_board_tactics(board: List[List[int]]) -> Dict[str, List[str]]:
 
 
 def describe_board_facts(board: List[List[int]], target_move: str) -> str:
+    size = len(board)
     black_stones = []
     white_stones = []
-    for r in range(BOARD_SIZE):
-        for c in range(BOARD_SIZE):
+    for r in range(size):
+        for c in range(size):
             if board[r][c] == BLACK:
-                black_stones.append(to_coord(r, c))
+                black_stones.append(to_coord(r, c, size))
             elif board[r][c] == WHITE:
-                white_stones.append(to_coord(r, c))
+                white_stones.append(to_coord(r, c, size))
 
     neighbor_desc = "N/A"
-    parsed = from_coord(target_move)
+    parsed = from_coord(target_move, size)
     if parsed:
         tr, tc = parsed
         n_parts = []
-        for nr, nc in get_neighbors(tr, tc):
+        for nr, nc in get_neighbors(tr, tc, size):
             cell = board[nr][nc]
             state = (
                 "Black (X)"
                 if cell == BLACK
                 else ("White (O)" if cell == WHITE else "Empty")
             )
-            n_parts.append(f"{to_coord(nr, nc)}={state}")
+            n_parts.append(f"{to_coord(nr, nc, size)}={state}")
         neighbor_desc = ", ".join(n_parts)
 
     return (
@@ -148,6 +150,7 @@ def _fallback_explanation(
     candidate_info: Optional[Dict[str, Any]],
     top_candidates: List[Dict[str, Any]],
     mode: str,
+    board_size: int = 9,
 ) -> str:
     if (
         candidate_info
@@ -181,7 +184,7 @@ def _fallback_explanation(
             f"Sensei's top engine choice here was {best['move']} ({best['winrate']}% winrate) "
             f"to {', '.join(best.get('tags', []))}."
         )
-    return f"Move {target_move} develops local shape on the 9x9 board."
+    return f"Move {target_move} develops local shape on the {board_size}x{board_size} board."
 
 
 async def _query_ollama(client: httpx.AsyncClient, model_name: str, prompt: str) -> str:
@@ -208,10 +211,11 @@ async def explain_move_with_sensei(
     turn_color: int,
     target_move: str,
     top_candidates: Optional[List[Dict[str, Any]]] = None,
-    mode: str = "hint",  # "hint" | "last_move"
+    mode: str = "hint",
     user_rank: str = "25k",
     model: str = "katago-instant",
 ) -> Dict[str, Any]:
+    size = len(board)
     top_candidates = top_candidates or []
     turn_label = "Black (X)" if turn_color == BLACK else "White (O)"
     tactics = scan_board_tactics(board)
@@ -220,7 +224,6 @@ async def explain_move_with_sensei(
         (c for c in top_candidates if c["move"].upper() == target_move.upper()), None
     )
 
-    # Zero-CPU instant GPU telemetry read (default during live play)
     if model == "katago-instant":
         return {
             "move": target_move,
@@ -262,13 +265,13 @@ async def explain_move_with_sensei(
 
     best_move_label = top_candidates[0]["move"] if top_candidates else target_move
 
-    prompt = f"""You are a sharp, encouraging 9x9 Go (Baduk) Sensei coaching a student.
+    prompt = f"""You are a sharp, encouraging {size}x{size} Go (Baduk) Sensei coaching a student.
 Ground your explanation strictly in the verified board facts and engine telemetry below. Never claim a stone exists at an empty intersection.
 
 Verified Board Inventory:
 {board_facts}
 
-9x9 Grid (X = Black, O = White, . = Empty):
+{size}x{size} Grid (X = Black, O = White, . = Empty):
 {ascii_grid}
 
 Tactical Scan:
@@ -319,7 +322,7 @@ Respond in exactly 3 concise bullet points (under 100 words total):
     return {
         "move": target_move,
         "explanation": _fallback_explanation(
-            target_move, turn_label, candidate_info, top_candidates, mode
+            target_move, turn_label, candidate_info, top_candidates, mode, size
         ),
         "model": "engine-heuristic",
         "source": "fallback",

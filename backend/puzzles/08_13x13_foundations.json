@@ -1,0 +1,145 @@
+{
+  "category": "13x13_foundations",
+  "title": "08. 13x13 Frameworks & Corners (18k-10k)",
+  "boardSize": 13,
+  "puzzles": [
+    {
+      "id": "p13_01",
+      "rank": "18k",
+      "title": "Two-Space Base Extension",
+      "turn": 1,
+      "concept": "On 13x13, a single stone on the 3rd line makes an ideal eye-shape base by extending two spaces (skipping two intersections) along the 3rd line.",
+      "prompt": "Black has a stone at F3. Extend two spaces along the bottom side to build a solid base.",
+      "stones": [
+        { "coord": "F3", "color": 1 },
+        { "coord": "D4", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "J3",
+          "feedback": "Exact! J3 is a textbook two-space extension from F3 along the 3rd line — hard to invade and quick to make two eyes."
+        }
+      ],
+      "wrongHints": {
+        "G3": "Too close (1-space jump) — over-concentrated on a 13x13 board.",
+        "K3": "3-space extension leaves a wide gap at H3 where White can wedge in.",
+        "default": "Extend two spaces along the 3rd line from F3."
+      }
+    },
+    {
+      "id": "p13_02",
+      "rank": "16k",
+      "title": "Knight's Corner Enclosure (Shimari)",
+      "turn": 1,
+      "concept": "Two stones in a knight's move (Keima) around the 3-4 point lock down a corner and project power down the side.",
+      "prompt": "Black owns D4 (3-4 point). Form a knight's corner enclosure on the bottom side.",
+      "stones": [
+        { "coord": "D4", "color": 1 },
+        { "coord": "K10", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "F3",
+          "feedback": "Clean Shimari! D4 + F3 secures the bottom-left corner and radiates influence across the bottom edge."
+        }
+      ],
+      "wrongHints": {
+        "E3": "A one-space jump is slower and less expansive than the knight's enclosure at F3.",
+        "default": "Form a knight's move enclosure from D4 toward the bottom side."
+      }
+    },
+    {
+      "id": "p13_03",
+      "rank": "15k",
+      "title": "3-3 Invasion Under 4-4",
+      "turn": 1,
+      "concept": "When an opponent leaves a 4-4 (Hoshi) stone unguarded, diving into the 3-3 point steals the corner territory cleanly.",
+      "prompt": "White's K10 stone guards the top-right loosely. Invade the 3-3 point to claim the corner.",
+      "stones": [
+        { "coord": "K10", "color": 2 },
+        { "coord": "D4", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "L11",
+          "feedback": "Spot on! L11 (3-3) lives cleanly inside the corner even after White blocks at K11."
+        }
+      ],
+      "wrongHints": {
+        "M12": "2-2 is too deep and gives White free thickness without extra eyes.",
+        "default": "Aim for the 3-3 intersection directly beneath White's K10 star point."
+      }
+    },
+    {
+      "id": "p13_04",
+      "rank": "14k",
+      "title": "Block the 3-3 Invasion",
+      "turn": 1,
+      "concept": "When invaded at 3-3 under your 4-4 stone, block on the side where you have more allied stones to build a unified wall.",
+      "prompt": "White just invaded L11 under your K10 stone, and you already have support at G10. Block on the top side!",
+      "stones": [
+        { "coord": "K10", "color": 1 },
+        { "coord": "G10", "color": 1 },
+        { "coord": "L11", "color": 2 }
+      ],
+      "solutions": [
+        {
+          "move": "K11",
+          "feedback": "Great direction of play! Blocking at K11 connects your wall directly toward your G10 stone."
+        }
+      ],
+      "wrongHints": {
+        "L10": "Blocking at L10 lets White crawl out along the top edge and split K10 from G10.",
+        "default": "Block on the top side (K11) to link with your G10 support stone."
+      }
+    },
+    {
+      "id": "p13_05",
+      "rank": "12k",
+      "title": "Shoulder Hit to Reduce a Moyo",
+      "turn": 1,
+      "concept": "Against a high 4th-line framework (moyo), a diagonal shoulder hit erases center potential while staying light and flexible.",
+      "prompt": "White has built a wide 4th-line wall at G10 and K10. Play a shoulder hit on G10 to reduce White's framework.",
+      "stones": [
+        { "coord": "G10", "color": 2 },
+        { "coord": "K10", "color": 2 },
+        { "coord": "D4", "color": 1 },
+        { "coord": "K4", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "G9",
+          "feedback": "Textbook shoulder hit! G9 pressures G10 from the center while keeping escape paths open on both sides."
+        }
+      ],
+      "wrongHints": {
+        "H10": "Wedging directly between G10 and K10 on the 4th line invites a brutal double attack.",
+        "default": "Play a diagonal shoulder hit one line below White's G10 stone."
+      }
+    },
+    {
+      "id": "p13_06",
+      "rank": "11k",
+      "title": "Splitting Two Enemy Extensions",
+      "turn": 1,
+      "concept": "When an opponent leaves a 4-space gap on a side, drop a splitting stone in the middle so they cannot link up into one giant territory.",
+      "prompt": "White has stones at D10 and J10 with a wide open gap between them. Split the top side!",
+      "stones": [
+        { "coord": "D10", "color": 2 },
+        { "coord": "J10", "color": 2 },
+        { "coord": "D4", "color": 1 },
+        { "coord": "K4", "color": 1 }
+      ],
+      "solutions": [
+        {
+          "move": "F10",
+          "feedback": "Nice split! F10 divides White's two stones so each group has to make its own base separately."
+        }
+      ],
+      "wrongHints": {
+        "G12": "1st-line plays surrender the entire 3rd/4th line framework to White.",
+        "default": "Place a splitting stone right in the middle of White's D10–J10 gap on the 3rd/4th line."
+      }
+    }
+  ]
+}

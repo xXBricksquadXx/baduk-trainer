@@ -32,8 +32,15 @@ from metrics_db import (
 from sensei_agent import explain_move_with_sensei
 
 PUZZLES_DIR = Path(__file__).parent / "puzzles"
-JOSEKI_FILE = Path(__file__).parent / "joseki" / "9x9_openings.json"
+JOSEKI_DIR = Path(__file__).parent / "joseki"
 init_db()
+
+
+def _validate_board(board: List[List[int]]) -> int:
+    size = len(board)
+    if size not in (9, 13) or any(len(r) != size for r in board):
+        raise HTTPException(status_code=400, detail="Board must be 9x9 or 13x13")
+    return size
 
 
 def _load_all_packs() -> List[dict]:
@@ -43,13 +50,16 @@ def _load_all_packs() -> List[dict]:
     for fpath in sorted(PUZZLES_DIR.glob("*.json")):
         with open(fpath, "r", encoding="utf-8") as f:
             pack = json.load(f)
+            pack_size = pack.get("boardSize", 9)
             for p in pack.get("puzzles", []):
-                b = create_empty_board()
+                b_size = p.get("boardSize", pack_size)
+                b = create_empty_board(b_size)
                 for st in p.get("stones", []):
-                    rc = from_coord(st["coord"])
+                    rc = from_coord(st["coord"], b_size)
                     if rc:
                         b[rc[0]][rc[1]] = st["color"]
                 p["board"] = b
+                p["boardSize"] = b_size
             packs.append(pack)
     return packs
 
@@ -68,9 +78,9 @@ def _build_console_banner() -> str:
 | | | |_| |_  /\__/ /  __/ | | \__ \  __/| | .___/ />  < .___/ /
 \_| |_/\___/  \____/ \___|_| |_|___/\___||_| \____//_/\_\\____/
 
-       =[ AI Sensei 9x9 // Baduk Dojo Framework v0.2.0        ]
+       =[ AI Sensei Dojo // Multi-Goban Framework v0.3.0     ]
 + -- --=[ Engine  : {engine:<41} ]
-+ -- --=[ Board   : {BOARD_SIZE}x{BOARD_SIZE} Goban | Ranks: 30 Kyu -> 1 Dan            ]
++ -- --=[ Boards  : 9x9 & 13x13 Goban | Ranks: 30 Kyu -> 1 Dan  ]
 + -- --=[ Dojo    : {len(packs)} Curriculum Packs ({drill_count} tactical drills)      ]
 + -- --=[ Profile : {stats['estimatedRank']:<10} | Record: {stats['matchWins']}W-{stats['totalMatches'] - stats['matchWins']}L ({stats['winRate']}%)     ]
 + -- --=[ Sensei  : GPU Instant Default + Ollama SGF Review   ]
@@ -85,7 +95,7 @@ async def lifespan(app: FastAPI):
     katago_session.stop()
 
 
-app = FastAPI(title="Baduk Trainer 9x9 API", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Baduk Trainer API", version="0.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -120,13 +130,13 @@ def health_check():
         "status": "ok",
         "engine": detect_engine_backend(),
         "boardSize": BOARD_SIZE,
+        "supportedSizes": [9, 13],
     }
 
 
 @app.post("/api/ai-move")
 def get_ai_move(req: MoveRequest):
-    if len(req.board) != BOARD_SIZE or any(len(r) != BOARD_SIZE for r in req.board):
-        raise HTTPException(status_code=400, detail="Board must be 9x9")
+    _validate_board(req.board)
 
     ko_tuple: Optional[Tuple[int, int]] = (
         (req.koPoint[0], req.koPoint[1])
@@ -184,8 +194,7 @@ def get_ai_move(req: MoveRequest):
 
 @app.post("/api/hints")
 def get_hints(req: MoveRequest):
-    if len(req.board) != BOARD_SIZE or any(len(r) != BOARD_SIZE for r in req.board):
-        raise HTTPException(status_code=400, detail="Board must be 9x9")
+    _validate_board(req.board)
 
     ko_tuple: Optional[Tuple[int, int]] = (
         (req.koPoint[0], req.koPoint[1])
@@ -201,8 +210,7 @@ def get_hints(req: MoveRequest):
 
 @app.post("/api/explain")
 async def explain_move(req: ExplainRequest):
-    if len(req.board) != BOARD_SIZE or any(len(r) != BOARD_SIZE for r in req.board):
-        raise HTTPException(status_code=400, detail="Board must be 9x9")
+    _validate_board(req.board)
 
     ko_tuple: Optional[Tuple[int, int]] = (
         (req.koPoint[0], req.koPoint[1])
@@ -250,11 +258,19 @@ def list_puzzles():
 
 
 @app.get("/api/joseki")
-def get_joseki_tree():
-    if not JOSEKI_FILE.exists():
-        return {"title": "9x9 Joseki Explorer", "root": {"move": None, "children": []}}
-    with open(JOSEKI_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+def get_joseki_tree(size: int = 9):
+    fname = "13x13_openings.json" if size == 13 else "9x9_openings.json"
+    jfile = JOSEKI_DIR / fname
+    if not jfile.exists():
+        return {
+            "title": f"{size}x{size} Joseki Explorer",
+            "boardSize": size,
+            "root": {"move": None, "children": []},
+        }
+    with open(jfile, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        data.setdefault("boardSize", size)
+        return data
 
 
 @app.post("/api/puzzles/attempt")
