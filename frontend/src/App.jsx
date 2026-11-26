@@ -373,6 +373,9 @@ export default function App() {
                   {dojo.progressStats.recentMatches.map((m, i) => (
                     <div key={i} className="log-entry">
                       <span className="idx">#{i + 1}</span>
+                      <span className="model-tag">
+                        {m.board_size || 9}x{m.board_size || 9}
+                      </span>
                       <span>vs {m.opponent_rank.toUpperCase()}</span>
                       <span>Played {m.human_color}</span>
                       <span className="cap-tag">
@@ -850,7 +853,7 @@ export default function App() {
                   </button>
                 </div>
 
-                {match.vsAi && (
+                {match.vsAi ? (
                   <div className="sym-grid-2 mt-10">
                     <button
                       className={match.humanColor === BLACK ? 'active' : ''}
@@ -871,30 +874,37 @@ export default function App() {
                       Play White
                     </button>
                   </div>
+                ) : (
+                  match.sgfMeta && (
+                    <button
+                      className="active mt-10"
+                      style={{ width: '100%' }}
+                      onClick={match.resumeVsAiFromPosition}
+                      disabled={Boolean(match.gameResult) || match.aiThinking}
+                      title="Play out variations from this SGF board against AI Sensei"
+                    >
+                      Resume vs AI ({aiRank.toUpperCase()})
+                    </button>
+                  )
                 )}
 
                 <div className="sym-grid-2 mt-10">
-                  {match.vsAi && (
-                    <label className="field-label">
-                      Sensei Rank
-                      <select
-                        value={aiRank}
-                        onChange={(e) => setAiRank(e.target.value)}
-                        disabled={match.aiThinking}
-                      >
-                        {RANK_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
+                  <label className="field-label">
+                    Sensei Rank
+                    <select
+                      value={aiRank}
+                      onChange={(e) => setAiRank(e.target.value)}
+                      disabled={match.aiThinking}
+                    >
+                      {RANK_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-                  <label
-                    className="field-label"
-                    style={!match.vsAi ? { gridColumn: '1 / -1' } : undefined}
-                  >
+                  <label className="field-label">
                     Komi / Handicap
                     <select
                       value={match.handicapId}

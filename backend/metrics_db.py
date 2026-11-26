@@ -61,6 +61,7 @@ def init_db() -> None:
                 margin REAL NOT NULL,
                 moves_count INTEGER NOT NULL,
                 rank_delta REAL NOT NULL DEFAULT 0.0,
+                board_size INTEGER NOT NULL DEFAULT 9,
                 played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """)
@@ -80,6 +81,10 @@ def init_db() -> None:
         if "rank_delta" not in cols_m:
             conn.execute(
                 "ALTER TABLE match_history ADD COLUMN rank_delta REAL NOT NULL DEFAULT 0.0"
+            )
+        if "board_size" not in cols_m:
+            conn.execute(
+                "ALTER TABLE match_history ADD COLUMN board_size INTEGER NOT NULL DEFAULT 9"
             )
 
 
@@ -108,20 +113,16 @@ def _compute_match_delta(
     """
     gap = curr_rank - opp_num
 
-    # Warm-up filter: beating a bot more than 3 Kyu weaker yields 0 rank gain
     if won and gap < -3.0:
         return 0.0
 
-    # Expected win probability (6.0 Kyu spread = ~90% expected win rate)
     expected_win = 1.0 / (1.0 + (10.0 ** (-gap / 6.0)))
     actual_score = 1.0 if won else 0.0
 
-    # Dynamic K-factor: scales up when defeating stronger opponents so breakthroughs converge fast
     upset_boost = max(0.0, gap) * 0.22 if won else 0.0
     margin_mod = min(0.25, max(0.0, margin) / 80.0) if won else 0.0
     k_factor = min(2.65, 0.90 + upset_boost + margin_mod)
 
-    # Negative delta improves Kyu (moves closer to 1.0k / Dan)
     delta = -k_factor * (actual_score - expected_win)
     return round(delta, 2)
 
@@ -152,7 +153,6 @@ def record_puzzle_result(puzzle_id: str, category: str, solved: bool) -> Dict[st
                 """,
                 (new_solved, new_attempts, puzzle_id),
             )
-            # Partial lab credit capped strictly at 24.0k
             if solved and not already_solved and curr_rank > 24.0:
                 rank_shift = -0.10
         else:
@@ -164,7 +164,6 @@ def record_puzzle_result(puzzle_id: str, category: str, solved: bool) -> Dict[st
                 """,
                 (puzzle_id, category, 1 if solved else 0, first_try),
             )
-            # Clean first-try lab credit capped strictly at 22.0k
             if solved and curr_rank > 22.0:
                 rank_shift = -0.25
 
@@ -183,8 +182,10 @@ def record_match_result(
     winner: str,
     margin: float,
     moves_count: int,
+    board_size: int = 9,
 ) -> Dict[str, Any]:
     init_db()
+    safe_size = 13 if board_size == 13 else 9
     with get_conn() as conn:
         profile = conn.execute(
             "SELECT numeric_rank FROM player_profile WHERE id = 1"
@@ -198,13 +199,12 @@ def record_match_result(
 
         conn.execute(
             """
-            INSERT INTO match_history (opponent_rank, human_color, winner, margin, moves_count, rank_delta)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO match_history (opponent_rank, human_color, winner, margin, moves_count, rank_delta, board_size)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (opponent_rank, human_color, winner, margin, moves_count, delta),
+            (opponent_rank, human_color, winner, margin, moves_count, delta, safe_size),
         )
 
-        # Pull rating up to within 2.0 stones of proven peer floor (defeated >= 2x)
         verified_floor = _get_verified_floor(conn)
         if verified_floor is not None and next_rank > verified_floor + 2.0:
             next_rank = round(verified_floor + 2.0, 2)
@@ -301,7 +301,6 @@ def get_progress_summary() -> Dict[str, Any]:
             round((total_wins / total_matches) * 100, 1) if total_matches > 0 else 0.0
         )
 
-        # Highest bot rank defeated at least twice (Verified Benchmark)
         verified_rows = conn.execute("""
             SELECT opponent_rank, COUNT(*) AS wins
             FROM match_history
@@ -317,7 +316,7 @@ def get_progress_summary() -> Dict[str, Any]:
             verified_str = _format_numeric_rank(strongest_num).replace(".0 ", " ")
 
         recent_matches = conn.execute("""
-            SELECT opponent_rank, human_color, winner, margin, moves_count, rank_delta, played_at
+            SELECT opponent_rank, human_color, winner, margin, moves_count, rank_delta, board_size, played_at
             FROM match_history
             ORDER BY id DESC
             LIMIT 10

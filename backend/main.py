@@ -247,6 +247,7 @@ class MatchRecordRequest(BaseModel):
     winner: str
     margin: float
     movesCount: int
+    boardSize: int = 9
 
 
 @app.get("/api/puzzles")
@@ -381,6 +382,7 @@ def save_match_metric(req: MatchRecordRequest):
         winner=req.winner,
         margin=req.margin,
         moves_count=req.movesCount,
+        board_size=req.boardSize,
     )
     return {"progress": progress}
 

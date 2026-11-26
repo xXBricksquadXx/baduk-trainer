@@ -68,13 +68,14 @@ export function useMatchEngine({
           winner: score.winner,
           margin: score.margin,
           movesCount: totalMoves,
+          boardSize,
         }),
       })
         .then((r) => r.json())
         .then((d) => d.progress && onProgressUpdate(d.progress))
         .catch(() => {});
     },
-    [apiBase, vsAi, aiRank, humanColor, onProgressUpdate],
+    [apiBase, vsAi, aiRank, humanColor, boardSize, onProgressUpdate],
   );
 
   const triggerAiTurn = useCallback(
@@ -247,6 +248,15 @@ export function useMatchEngine({
       setStatusBanner,
     ],
   );
+
+  const resumeVsAiFromPosition = useCallback(async () => {
+    if (gameResult || aiThinking) return;
+    setVsAi(true);
+    setHumanColor(currentTurn);
+    setStatusBanner(
+      `Resumed vs AI Sensei (${aiRank.toUpperCase()}) as ${currentTurn === BLACK ? 'Black' : 'White'}.`,
+    );
+  }, [gameResult, aiThinking, currentTurn, aiRank, setStatusBanner]);
 
   const handleIntersectionClick = async (row, col) => {
     if (gameResult || aiThinking) return;
@@ -565,6 +575,7 @@ export function useMatchEngine({
     lastBlackMove,
     lastWhiteMove,
     startFreshMatch,
+    resumeVsAiFromPosition,
     handleIntersectionClick,
     handlePass,
     handleUndo,
