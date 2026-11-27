@@ -1,3 +1,4 @@
+import random
 import re
 import subprocess
 import threading
@@ -30,7 +31,7 @@ def is_katago_ready() -> bool:
 
 
 def _rank_to_visits(rank: str) -> int:
-    """Calibrates KataGo maxVisits so 3k feels human-beatable while 1d+ pushes hard."""
+    """Gradually ramps KataGo search depth from 12k policy intuition up to 1d+."""
     r = rank.strip().lower()
     if r.endswith("d"):
         dan = max(1, min(9, int(r[:-1] or 1)))
@@ -39,13 +40,25 @@ def _rank_to_visits(rank: str) -> int:
         try:
             kyu = max(1, min(30, int(r[:-1])))
         except ValueError:
-            kyu = 6
+            kyu = 12
         if kyu <= 3:
             return 18
         if kyu <= 6:
-            return 8
-        return 4
+            return 6
+        if kyu <= 9:
+            return 3
+        return 2
     return 25
+
+
+def _parse_kyu(rank: str) -> Optional[int]:
+    r = rank.strip().lower()
+    if r.endswith("k"):
+        try:
+            return max(1, min(30, int(r[:-1])))
+        except ValueError:
+            return None
+    return None
 
 
 class KataGoSession:
@@ -240,6 +253,25 @@ class KataGoSession:
     ) -> Optional[Dict[str, Any]]:
         if not self.start():
             return None
+
+        kyu = _parse_kyu(rank)
+        # For 7k-15k, sample among top 3-4 candidates so KataGo plays softer, human-beatable shapes
+        if kyu is not None and kyu >= 7:
+            pool_size = 4 if kyu >= 11 else 3
+            candidates = self.analyze_position(
+                board, color, rank=rank, top_k=pool_size, komi=komi
+            )
+            if candidates:
+                weights = [1.0 / (idx + 0.6) for idx in range(len(candidates))]
+                chosen = random.choices(candidates, weights=weights, k=1)[0]
+                return {
+                    "move": chosen["move"],
+                    "row": chosen["row"],
+                    "col": chosen["col"],
+                    "winrate": chosen["winrate"],
+                    "tags": [f"KataGo GPU ({rank.upper()} Soft)"],
+                }
+
         size = len(board)
         visits = _rank_to_visits(rank)
         gtp_color = "B" if color == BLACK else "W"

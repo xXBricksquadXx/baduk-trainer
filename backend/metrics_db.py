@@ -88,15 +88,25 @@ def init_db() -> None:
             )
 
 
-def _get_verified_floor(conn: sqlite3.Connection) -> float | None:
-    """Returns the lowest (strongest) numeric rank defeated at least twice."""
-    rows = conn.execute("""
+def _get_recent_verified_floor(
+    conn: sqlite3.Connection, window: int = 20
+) -> float | None:
+    """Returns the strongest rank defeated >=2 times within the most recent `window` games."""
+    rows = conn.execute(
+        """
         SELECT opponent_rank, COUNT(*) AS wins
-        FROM match_history
+        FROM (
+            SELECT opponent_rank, winner, human_color
+            FROM match_history
+            ORDER BY id DESC
+            LIMIT ?
+        )
         WHERE LOWER(winner) = LOWER(human_color)
         GROUP BY LOWER(opponent_rank)
         HAVING wins >= 2
-        """).fetchall()
+        """,
+        (window,),
+    ).fetchall()
     if not rows:
         return None
     return min(_parse_rank_to_numeric(r["opponent_rank"]) for r in rows)
@@ -106,10 +116,11 @@ def _compute_match_delta(
     curr_rank: float, opp_num: float, won: bool, margin: float
 ) -> float:
     """
-    AGA/Glicko-inspired rank delta:
-    - Gap > 0: opponent is stronger than player (volatility scales up on upsets).
-    - Gap < 0: opponent is weaker than player.
-    - Zero rating gain if beating an opponent > 3.0 Kyu weaker than current rating.
+    Recency-Responsive Tower / Glicko Delta:
+    - Winning against stronger bots scales K up so breakthroughs advance fast.
+    - Losing against weaker bots (gap < 0) scales K up proportionally so rank settles
+      rapidly onto the exact Tower floor you need to train at.
+    - Beating a bot > 3.0 Kyu weaker yields 0 rating gain (warm-up filter).
     """
     gap = curr_rank - opp_num
 
@@ -119,9 +130,15 @@ def _compute_match_delta(
     expected_win = 1.0 / (1.0 + (10.0 ** (-gap / 6.0)))
     actual_score = 1.0 if won else 0.0
 
-    upset_boost = max(0.0, gap) * 0.22 if won else 0.0
-    margin_mod = min(0.25, max(0.0, margin) / 80.0) if won else 0.0
-    k_factor = min(2.65, 0.90 + upset_boost + margin_mod)
+    if won:
+        upset_boost = max(0.0, gap) * 0.22
+        margin_mod = min(0.25, max(0.0, margin) / 80.0)
+        k_factor = min(2.65, 0.90 + upset_boost + margin_mod)
+    else:
+        # Losing to a nominally weaker opponent accelerates downward calibration
+        downward_boost = max(0.0, -gap) * 0.28
+        margin_mod = min(0.35, max(0.0, margin) / 90.0)
+        k_factor = min(3.25, 0.95 + downward_boost + margin_mod)
 
     delta = -k_factor * (actual_score - expected_win)
     return round(delta, 2)
@@ -205,7 +222,8 @@ def record_match_result(
             (opponent_rank, human_color, winner, margin, moves_count, delta, safe_size),
         )
 
-        verified_floor = _get_verified_floor(conn)
+        # Anchor to within 2.0 stones of recent proven floor (last 20 games)
+        verified_floor = _get_recent_verified_floor(conn, window=20)
         if verified_floor is not None and next_rank > verified_floor + 2.0:
             next_rank = round(verified_floor + 2.0, 2)
 
@@ -217,7 +235,7 @@ def record_match_result(
 
 
 def recalculate_honest_rank() -> Dict[str, Any]:
-    """Replays existing puzzles + match_history from 30.0k under the weighted AGA/Elo rubric."""
+    """Replays existing puzzles + match_history from 30.0k under the recency-weighted Tower rubric."""
     init_db()
     with get_conn() as conn:
         puzzles = conn.execute(
@@ -234,20 +252,23 @@ def recalculate_honest_rank() -> Dict[str, Any]:
         matches = conn.execute(
             "SELECT id, opponent_rank, human_color, winner, margin FROM match_history ORDER BY id ASC"
         ).fetchall()
-        wins_by_opp: Dict[float, int] = {}
+        recent_wins: list[float] = []
         for m in matches:
             opp_num = _parse_rank_to_numeric(m["opponent_rank"])
             won = m["winner"].strip().lower() == m["human_color"].strip().lower()
             delta = _compute_match_delta(rank, opp_num, won, float(m["margin"]))
             rank = max(-8.0, min(30.0, round(rank + delta, 2)))
 
-            if won:
-                wins_by_opp[opp_num] = wins_by_opp.get(opp_num, 0) + 1
-                verified_ranks = [r for r, cnt in wins_by_opp.items() if cnt >= 2]
-                if verified_ranks:
-                    floor = min(verified_ranks)
-                    if rank > floor + 2.0:
-                        rank = round(floor + 2.0, 2)
+            recent_wins.append(opp_num if won else 999.0)
+            window_slice = [r for r in recent_wins[-20:] if r < 900.0]
+            counts: Dict[float, int] = {}
+            for r in window_slice:
+                counts[r] = counts.get(r, 0) + 1
+            verified_ranks = [r for r, cnt in counts.items() if cnt >= 2]
+            if verified_ranks:
+                floor = min(verified_ranks)
+                if rank > floor + 2.0:
+                    rank = round(floor + 2.0, 2)
 
             conn.execute(
                 "UPDATE match_history SET rank_delta = ? WHERE id = ?",
@@ -301,19 +322,12 @@ def get_progress_summary() -> Dict[str, Any]:
             round((total_wins / total_matches) * 100, 1) if total_matches > 0 else 0.0
         )
 
-        verified_rows = conn.execute("""
-            SELECT opponent_rank, COUNT(*) AS wins
-            FROM match_history
-            WHERE LOWER(winner) = LOWER(human_color)
-            GROUP BY LOWER(opponent_rank)
-            HAVING wins >= 2
-            """).fetchall()
-        verified_str = "Unranked"
-        if verified_rows:
-            strongest_num = min(
-                _parse_rank_to_numeric(r["opponent_rank"]) for r in verified_rows
-            )
-            verified_str = _format_numeric_rank(strongest_num).replace(".0 ", " ")
+        verified_floor = _get_recent_verified_floor(conn, window=20)
+        verified_str = (
+            _format_numeric_rank(verified_floor).replace(".0 ", " ")
+            if verified_floor is not None
+            else "Unranked"
+        )
 
         recent_matches = conn.execute("""
             SELECT opponent_rank, human_color, winner, margin, moves_count, rank_delta, board_size, played_at

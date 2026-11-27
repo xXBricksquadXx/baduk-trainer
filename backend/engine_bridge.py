@@ -35,7 +35,6 @@ POSITION_WEIGHTS_9X9 = [
 def _positional_prior(size: int, row: int, col: int) -> float:
     if size == 9:
         return POSITION_WEIGHTS_9X9[row][col]
-    # Dynamic 13x13 prior: favors 3rd/4th line corners and sides, penalizes 1st/2nd line early
     edge_dist = min(row, size - 1 - row, col, size - 1 - col)
     if edge_dist == 0:
         return 0.1
@@ -55,21 +54,45 @@ def detect_engine_backend() -> str:
     return "python-mcts-calibrated"
 
 
-def _should_use_katago(rank: str, board_size: int = BOARD_SIZE) -> bool:
-    """Routes 3k, 1d+, and 13x13 boards to KataGo GPU while keeping 30k-6k 9x9 on Python MCTS."""
+def _katago_blend_probability(rank: str, board_size: int = BOARD_SIZE) -> float:
+    """
+    Smooth Tower Ramp:
+    - 30k–15k (9x9): 0% KataGo (100% Python MCTS tactical rhythm)
+    - 12k: 25% KataGo soft / 75% MCTS
+    - 9k:  55% KataGo soft / 45% MCTS
+    - 6k:  85% KataGo / 15% MCTS
+    - 3k–1d+ (and 13x13): 100% KataGo GPU
+    """
     if not is_katago_ready():
-        return False
+        return 0.0
     if board_size > 9:
-        return True
+        return 1.0
     r = rank.strip().lower()
     if r.endswith("d"):
-        return True
+        return 1.0
     if r.endswith("k"):
         try:
-            return int(r[:-1]) <= 3
+            kyu = int(r[:-1])
         except ValueError:
-            return False
-    return False
+            return 0.0
+        if kyu <= 3:
+            return 1.0
+        if kyu <= 6:
+            return 0.85
+        if kyu <= 9:
+            return 0.55
+        if kyu <= 12:
+            return 0.25
+    return 0.0
+
+
+def _should_use_katago(rank: str, board_size: int = BOARD_SIZE) -> bool:
+    prob = _katago_blend_probability(rank, board_size)
+    if prob <= 0.0:
+        return False
+    if prob >= 1.0:
+        return True
+    return random.random() < prob
 
 
 def rank_label_to_strength(rank: str) -> Dict[str, Any]:
